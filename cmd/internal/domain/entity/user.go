@@ -1,6 +1,6 @@
 package entity
 
-// User is meant to be immutable
+// User is the general basic structure of all users across the platform
 type User struct {
 	ID            int    `gorm:"primaryKey"`
 	SubUUID       string `gorm:"not null"`
