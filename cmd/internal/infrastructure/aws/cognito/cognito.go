@@ -1,10 +1,13 @@
 package cognitoclient
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	cognito "github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
+	"context"
 	"os"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 
 var Client CognitoInterface
@@ -52,22 +55,18 @@ type CognitoInterface interface {
 }
 
 type cognitoClient struct {
-	cognitoClient *cognito.CognitoIdentityProvider
+	cognitoClient *cognitoidentityprovider.Client
 	appClientId   string
 }
 
 func InitCognitoClient(appClientId string) error {
-	config := aws.Config{
-		Region:                        aws.String(os.Getenv("AWS_COGNITO_REGION")),
-		CredentialsChainVerboseErrors: aws.Bool(true),
-	}
-
-	sess, err := session.NewSession(&config)
+	region := os.Getenv("AWS_COGNITO_REGION")
+	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return err
 	}
 
-	client := cognito.New(sess)
+	client := cognitoidentityprovider.NewFromConfig(cfg)
 	Client = &cognitoClient{
 		cognitoClient: client,
 		appClientId:   appClientId,
@@ -76,70 +75,61 @@ func InitCognitoClient(appClientId string) error {
 }
 
 func (c *cognitoClient) SignUp(user *User) (string, error) {
-	userCognito := &cognito.SignUpInput{
+	input := &cognitoidentityprovider.SignUpInput{
 		ClientId: aws.String(c.appClientId),
 		Username: aws.String(user.Email),
 		Password: aws.String(user.Password),
-		UserAttributes: []*cognito.AttributeType{
+		UserAttributes: []types.AttributeType{
 			{
 				Name:  aws.String("email"),
 				Value: aws.String(user.Email),
 			},
 		},
 	}
-	out, err := c.cognitoClient.SignUp(userCognito)
+	out, err := c.cognitoClient.SignUp(context.Background(), input)
 	if err != nil {
 		return "", err
 	}
-	return *out.UserSub, nil
+	return aws.ToString(out.UserSub), nil
 }
 
 func (c *cognitoClient) GlobalSignOut(accessToken string) error {
-	logout := &cognito.GlobalSignOutInput{
+	input := &cognitoidentityprovider.GlobalSignOutInput{
 		AccessToken: aws.String(accessToken),
 	}
-	_, err := c.cognitoClient.GlobalSignOut(logout)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := c.cognitoClient.GlobalSignOut(context.Background(), input)
+	return err
 }
 
 func (c *cognitoClient) ConfirmAccount(user *UserConfirmation) error {
-	confirmationInput := &cognito.ConfirmSignUpInput{
+	input := &cognitoidentityprovider.ConfirmSignUpInput{
 		Username:         aws.String(user.Email),
 		ConfirmationCode: aws.String(user.Code),
 		ClientId:         aws.String(c.appClientId),
 	}
-	_, err := c.cognitoClient.ConfirmSignUp(confirmationInput)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := c.cognitoClient.ConfirmSignUp(context.Background(), input)
+	return err
 }
 
 func (c *cognitoClient) ResendConfirmation(email string) error {
-	confirmationInput := &cognito.ResendConfirmationCodeInput{
+	input := &cognitoidentityprovider.ResendConfirmationCodeInput{
 		Username: aws.String(email),
 		ClientId: aws.String(c.appClientId),
 	}
-	_, err := c.cognitoClient.ResendConfirmationCode(confirmationInput)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := c.cognitoClient.ResendConfirmationCode(context.Background(), input)
+	return err
 }
 
 func (c *cognitoClient) SignIn(user *UserLogin) (*AuthCreate, error) {
-	authInput := &cognito.InitiateAuthInput{
-		AuthFlow: aws.String("USER_PASSWORD_AUTH"),
-		AuthParameters: aws.StringMap(map[string]string{
+	input := &cognitoidentityprovider.InitiateAuthInput{
+		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
+		AuthParameters: map[string]string{
 			"USERNAME": user.Email,
 			"PASSWORD": user.Password,
-		}),
+		},
 		ClientId: aws.String(c.appClientId),
 	}
-	result, err := c.cognitoClient.InitiateAuth(authInput)
+	result, err := c.cognitoClient.InitiateAuth(context.Background(), input)
 	if err != nil {
 		return nil, err
 	}
