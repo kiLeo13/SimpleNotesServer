@@ -14,26 +14,26 @@ var Client CognitoInterface
 
 // User is the default user struct for all basic Cognito operations.
 type User struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string
+	Password string
 }
 
 // UserConfirmation is the default structure for approving e-mail verification.
 type UserConfirmation struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email string
+	Code  string
 }
 
 // UserLogin defines the standard structure for logging in to the application.
 type UserLogin struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string
+	Password string
 }
 
 // AuthCreate represents the response of Cognito sign in approval.
 type AuthCreate struct {
-	IDToken     string `json:"id_token"`
-	AccessToken string `json:"access_token"`
+	IDToken     string
+	AccessToken string
 }
 
 type CognitoInterface interface {
