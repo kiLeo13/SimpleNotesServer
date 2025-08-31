@@ -14,18 +14,17 @@ import (
 )
 
 type NoteResponse struct {
-	ID        int      `json:"id"`
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Content   string   `json:"content"`
-	Aliases   []string `json:"aliases"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID          int      `json:"id"`
+	Name        string   `json:"name"`
+	Content     string   `json:"content"`
+	Aliases     []string `json:"aliases"`
+	CreatedByID int      `json:"created_by_id"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
 }
 
 type NoteRequest struct {
 	Name    string   `json:"name" validate:"required,min=2,max=80"`
-	Type    string   `json:"type" validate:"required,oneof=PDF IMAGE TEXT VIDEO AUDIO"`
 	Aliases []string `json:"aliases" validate:"required,max=50"`
 	Content string   `json:"content" validate:"required"`
 }
@@ -132,7 +131,6 @@ func trxInsertNoteWithAliases(tx *gorm.DB, req *NoteRequest) (*entity.Note, erro
 	timestamp := time.Now().UTC().UnixMilli()
 	note := &entity.Note{
 		Name:      req.Name,
-		Type:      req.Type,
 		Content:   req.Content,
 		CreatedAt: timestamp,
 		UpdatedAt: timestamp,
@@ -208,7 +206,6 @@ func toNoteResponse(note *entity.Note, aliases []string) *NoteResponse {
 	return &NoteResponse{
 		ID:        note.ID,
 		Name:      note.Name,
-		Type:      note.Type,
 		Content:   note.Content,
 		Aliases:   aliases,
 		CreatedAt: FormatEpoch(note.CreatedAt),
