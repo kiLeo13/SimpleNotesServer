@@ -37,6 +37,12 @@ type AuthCreate struct {
 }
 
 type CognitoInterface interface {
+	//==============================//
+	//                              //
+	//     Self-user Operations     //
+	//                              //
+	//==============================//
+
 	// SignUp creates a new user row on Cognito and return its "sub" (the UUID).
 	SignUp(user *User) (string, error)
 
@@ -52,15 +58,26 @@ type CognitoInterface interface {
 
 	// ResendConfirmation resends the verification code to the provided e-mail.
 	ResendConfirmation(email string) error
+
+	//==========================//
+	//                          //
+	//     Admin Operations     //
+	//                          //
+	//==========================//
+
+	// AdminDeleteUser deletes a user by their email on behalf of the application.
+	AdminDeleteUser(email string) error
 }
 
 type cognitoClient struct {
 	cognitoClient *cognitoidentityprovider.Client
+	poolId        string
 	appClientId   string
 }
 
 func InitCognitoClient(appClientId string) error {
 	region := os.Getenv("AWS_COGNITO_REGION")
+	poolId := os.Getenv("AWS_COGNITO_USER_POOL_ID")
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return err
@@ -69,6 +86,7 @@ func InitCognitoClient(appClientId string) error {
 	client := cognitoidentityprovider.NewFromConfig(cfg)
 	Client = &cognitoClient{
 		cognitoClient: client,
+		poolId:        poolId,
 		appClientId:   appClientId,
 	}
 	return nil
@@ -137,4 +155,13 @@ func (c *cognitoClient) SignIn(user *UserLogin) (*AuthCreate, error) {
 		IDToken:     *result.AuthenticationResult.IdToken,
 		AccessToken: *result.AuthenticationResult.AccessToken,
 	}, nil
+}
+
+func (c *cognitoClient) AdminDeleteUser(email string) error {
+	input := &cognitoidentityprovider.AdminDeleteUserInput{
+		UserPoolId: aws.String(c.poolId),
+		Username:   aws.String(email),
+	}
+	_, err := c.cognitoClient.AdminDeleteUser(context.Background(), input)
+	return err
 }
