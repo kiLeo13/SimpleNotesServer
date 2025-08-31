@@ -34,10 +34,20 @@ type AuthCreate struct {
 }
 
 type CognitoInterface interface {
+	// SignUp creates a new user row on Cognito and return its "sub" (the UUID).
 	SignUp(user *User) (string, error)
+
+	// SignIn signs the user in and returns its respective access and ID tokens.
 	SignIn(user *UserLogin) (*AuthCreate, error)
+
+	// GlobalSignOut signs out all the user session in all devices.
+	// In other words, it invalidates all the existing JWT tokens.
 	GlobalSignOut(accessToken string) error
+
+	// ConfirmAccount is used to verify the user's e-mail address.
 	ConfirmAccount(user *UserConfirmation) error
+
+	// ResendConfirmation resends the verification code to the provided e-mail.
 	ResendConfirmation(email string) error
 }
 
@@ -65,7 +75,6 @@ func InitCognitoClient(appClientId string) error {
 	return nil
 }
 
-// SignUp creates a new user row on Cognito and return its "sub" (the UUID)
 func (c *cognitoClient) SignUp(user *User) (string, error) {
 	userCognito := &cognito.SignUpInput{
 		ClientId: aws.String(c.appClientId),
@@ -85,8 +94,6 @@ func (c *cognitoClient) SignUp(user *User) (string, error) {
 	return *out.UserSub, nil
 }
 
-// GlobalSignOut signs out all the user session in all devices.
-// In other words, it invalidates all the existing JWT tokens
 func (c *cognitoClient) GlobalSignOut(accessToken string) error {
 	logout := &cognito.GlobalSignOutInput{
 		AccessToken: aws.String(accessToken),
@@ -98,7 +105,6 @@ func (c *cognitoClient) GlobalSignOut(accessToken string) error {
 	return nil
 }
 
-// ConfirmAccount is used to verify the user's e-mail address
 func (c *cognitoClient) ConfirmAccount(user *UserConfirmation) error {
 	confirmationInput := &cognito.ConfirmSignUpInput{
 		Username:         aws.String(user.Email),
@@ -112,7 +118,6 @@ func (c *cognitoClient) ConfirmAccount(user *UserConfirmation) error {
 	return nil
 }
 
-// ResendConfirmation resends the verification code to the provided e-mail
 func (c *cognitoClient) ResendConfirmation(email string) error {
 	confirmationInput := &cognito.ResendConfirmationCodeInput{
 		Username: aws.String(email),
@@ -125,7 +130,6 @@ func (c *cognitoClient) ResendConfirmation(email string) error {
 	return nil
 }
 
-// SignIn signs the user in... pretty straightforward
 func (c *cognitoClient) SignIn(user *UserLogin) (*AuthCreate, error) {
 	authInput := &cognito.InitiateAuthInput{
 		AuthFlow: aws.String("USER_PASSWORD_AUTH"),
