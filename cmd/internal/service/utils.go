@@ -9,3 +9,9 @@ func FormatEpoch(millis int64) string {
 		UTC().
 		Format(time.RFC3339)
 }
+
+func NowUTC() int64 {
+	return time.Now().
+		UTC().
+		UnixMilli()
+}
