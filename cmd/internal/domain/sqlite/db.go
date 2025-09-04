@@ -9,18 +9,16 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-
-func Init() error {
+func Init() (*gorm.DB, error) {
 	dbPath := filepath.Join(".", "database.db")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = db.AutoMigrate(&entity.Note{}, &entity.User{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sqlDB, _ := db.DB()
@@ -28,6 +26,5 @@ func Init() error {
 	sqlDB.SetMaxIdleConns(1)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	DB = db
-	return nil
+	return db, nil
 }
