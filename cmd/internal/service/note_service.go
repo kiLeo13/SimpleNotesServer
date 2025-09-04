@@ -1,23 +1,26 @@
 package service
 
 import (
-	"errors"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
-	"gorm.io/gorm"
 	"net/http"
 	"regexp"
 	"simplenotes/internal/domain/entity"
-	"simplenotes/internal/domain/sqlite"
 	"strings"
-	"time"
 )
+
+const (
+	MinAliasLength = 2
+	MaxAliasLength = 30
+)
+
+var whitespaceRegex = regexp.MustCompile(`\s+`)
 
 type NoteResponse struct {
 	ID          int      `json:"id"`
 	Name        string   `json:"name"`
 	Content     string   `json:"content"`
-	Aliases     []string `json:"aliases"`
+	Tags        []string `json:"tags"`
 	CreatedByID int      `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
@@ -25,138 +28,85 @@ type NoteResponse struct {
 
 type NoteRequest struct {
 	Name    string   `json:"name" validate:"required,min=2,max=80"`
-	Aliases []string `json:"aliases" validate:"required,max=50"`
+	Tags    []string `json:"tags" validate:"required,max=50"`
 	Content string   `json:"content" validate:"required"`
 }
 
-const (
-	MinAliasLength = 2
-	MaxAliasLength = 30
-)
+type NoteRepository interface {
+	FindAll() ([]*entity.Note, error)
+	FindByID(id int) (*entity.Note, error)
+	Save(note *entity.Note) error
+	Delete(note *entity.Note) error
+}
 
-var validate = validator.New()
-var whitespaceRegex = regexp.MustCompile(`\s+`)
+type DefaultNoteService struct {
+	NoteRepo NoteRepository
+	Validate *validator.Validate
+}
 
-func GetAllNotes() ([]*NoteResponse, *APIError) {
-	var notes []*entity.Note
-	var aliases []*entity.NoteAlias
+func NewNoteService(noteRepo NoteRepository, validate *validator.Validate) *DefaultNoteService {
+	return &DefaultNoteService{NoteRepo: noteRepo, Validate: validate}
+}
 
-	err := sqlite.DB.Find(&notes).Error
+func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *APIError) {
+	notes, err := n.NoteRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
-		return nil, ErrorInternalServer
+		return nil, InternalServerError
 	}
 
-	err = sqlite.DB.Find(&aliases).Error
-	if err != nil {
-		log.Errorf("failed to fetch aliases: %v", err)
-		return nil, ErrorInternalServer
-	}
-
-	mappedAliases := toNotesAliasesMap(aliases)
 	resp := make([]*NoteResponse, len(notes))
 	for i, note := range notes {
-		noteAliases, ok := mappedAliases[note.ID]
-		if !ok {
-			noteAliases = []string{}
-		}
-
-		resp[i] = toNoteResponse(note, noteAliases)
+		resp[i] = toNoteResponse(note)
 	}
 	return resp, nil
 }
 
-func CreateNote(req *NoteRequest) (*NoteResponse, *APIError) {
-	if err := validate.Struct(req); err != nil {
+func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *APIError) {
+	if err := n.Validate.Struct(req); err != nil {
 		return nil, NewError(http.StatusBadRequest, err.Error())
 	}
 
-	req.Aliases = sanitizeAliases(req.Aliases)
-	apierr := validateAliases(req.Aliases)
+	req.Tags = sanitizeAliases(req.Tags)
+	apierr := validateAliases(req.Tags)
 	if apierr != nil {
 		return nil, apierr
 	}
 
-	var note *entity.Note
-	err := sqlite.DB.Transaction(func(tx *gorm.DB) error {
-		var err error
-		note, err = trxInsertNoteWithAliases(tx, req)
-		return err
-	})
-
-	if err != nil {
-		log.Errorf("failed to create note: %v", err)
-		return nil, ErrorInternalServer
-	}
-
-	// Shhh 🤫, they will never notice this
-	return toNoteResponse(note, req.Aliases), nil
-}
-
-func DeleteNote(noteId int) *APIError {
-	var note *entity.Note
-	err := sqlite.DB.First(&note, noteId).Error
-	isMissing := errors.Is(err, gorm.ErrRecordNotFound)
-	if err != nil && !isMissing {
-		log.Errorf("failed to fetch note: %v", err)
-		return ErrorInternalServer
-	}
-
-	if isMissing {
-		return ErrorNotFound
-	}
-
-	err = sqlite.DB.Delete(note, noteId).Error
-	if err != nil {
-		log.Errorf("failed to delete note: %v", err)
-		return ErrorInternalServer
-	}
-	return nil
-}
-
-// toNotesAliasesMap returns a map that associates each note ID with its corresponding list of aliases.
-// It takes a slice of NoteAlias entities as input and returns a map where the key is the note ID,
-// and the value is a slice of strings representing all aliases of that note.
-func toNotesAliasesMap(aliases []*entity.NoteAlias) map[int][]string {
-	out := make(map[int][]string)
-	for _, alias := range aliases {
-		noteID := alias.NoteID
-		out[noteID] = append(out[noteID], alias.Value)
-	}
-	return out
-}
-
-// trxInsertNoteWithAliases saves the whole note (with its aliases) in a single transaction
-func trxInsertNoteWithAliases(tx *gorm.DB, req *NoteRequest) (*entity.Note, error) {
-	timestamp := time.Now().UTC().UnixMilli()
+	now := NowUTC()
 	note := &entity.Note{
 		Name:      req.Name,
 		Content:   req.Content,
-		CreatedAt: timestamp,
-		UpdatedAt: timestamp,
+		Tags:      strings.Join(req.Tags, " "),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
-	if err := tx.Create(note).Error; err != nil {
-		return nil, err
+	err := n.NoteRepo.Save(note)
+	if err != nil {
+		log.Errorf("failed to create note: %v", err)
+		return nil, InternalServerError
+	}
+	return toNoteResponse(note), nil
+}
+
+func (n *DefaultNoteService) DeleteNote(noteId int) *APIError {
+	note, err := n.NoteRepo.FindByID(noteId)
+	if err != nil {
+		log.Errorf("failed to fetch note: %v", err)
+		return InternalServerError
 	}
 
-	if len(req.Aliases) <= 0 {
-		return note, nil
+	if note == nil {
+		return NotFoundError
 	}
 
-	aliases := make([]*entity.NoteAlias, len(req.Aliases))
-	for i, alias := range req.Aliases {
-		aliases[i] = &entity.NoteAlias{
-			NoteID:    note.ID,
-			Value:     strings.ToLower(alias),
-			CreatedAt: timestamp,
-		}
+	err = n.NoteRepo.Delete(note)
+	if err != nil {
+		log.Errorf("failed to delete note: %v", err)
+		return InternalServerError
 	}
-
-	if err := tx.Create(&aliases).Error; err != nil {
-		return nil, err
-	}
-	return note, nil
+	return nil
 }
 
 func validateAliases(vals []string) *APIError {
@@ -167,7 +117,7 @@ func validateAliases(vals []string) *APIError {
 	}
 
 	if hasDuplicates(vals) {
-		return ErrorDuplicateAlias
+		return DuplicateAliasError
 	}
 	return nil
 }
@@ -202,13 +152,14 @@ func sanitizeAliases(vals []string) []string {
 	return out
 }
 
-func toNoteResponse(note *entity.Note, aliases []string) *NoteResponse {
+func toNoteResponse(note *entity.Note) *NoteResponse {
 	return &NoteResponse{
-		ID:        note.ID,
-		Name:      note.Name,
-		Content:   note.Content,
-		Aliases:   aliases,
-		CreatedAt: FormatEpoch(note.CreatedAt),
-		UpdatedAt: FormatEpoch(note.UpdatedAt),
+		ID:          note.ID,
+		Name:        note.Name,
+		Content:     note.Content,
+		Tags:        strings.Split(note.Tags, " "),
+		CreatedByID: note.CreatedByID,
+		CreatedAt:   FormatEpoch(note.CreatedAt),
+		UpdatedAt:   FormatEpoch(note.UpdatedAt),
 	}
 }
