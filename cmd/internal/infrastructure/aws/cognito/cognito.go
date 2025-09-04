@@ -10,8 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 
-var Client CognitoInterface
-
 // User is the default user struct for all basic Cognito operations.
 type User struct {
 	Email    string
@@ -75,21 +73,20 @@ type cognitoClient struct {
 	appClientId   string
 }
 
-func InitCognitoClient(appClientId string) error {
+func InitCognitoClient(appClientId string) (CognitoInterface, error) {
 	region := os.Getenv("AWS_COGNITO_REGION")
 	poolId := os.Getenv("AWS_COGNITO_USER_POOL_ID")
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	client := cognitoidentityprovider.NewFromConfig(cfg)
-	Client = &cognitoClient{
+	return &cognitoClient{
 		cognitoClient: client,
 		poolId:        poolId,
 		appClientId:   appClientId,
-	}
-	return nil
+	}, nil
 }
 
 func (c *cognitoClient) SignUp(user *User) (string, error) {
