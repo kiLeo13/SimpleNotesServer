@@ -4,13 +4,14 @@ import (
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"simplenotes/internal/service"
+	"simplenotes/internal/utils/apierror"
 	"strconv"
 )
 
 type NoteService interface {
-	GetAllNotes() ([]*service.NoteResponse, *service.APIError)
-	CreateNote(req *service.NoteRequest) (*service.NoteResponse, *service.APIError)
-	DeleteNote(noteId int) *service.APIError
+	GetAllNotes() ([]*service.NoteResponse, *apierror.APIError)
+	CreateNote(req *service.NoteRequest) (*service.NoteResponse, *apierror.APIError)
+	DeleteNote(noteId int) *apierror.APIError
 }
 
 type DefaultNoteRoute struct {
@@ -36,7 +37,7 @@ func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
 func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
 	var req service.NoteRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(400, service.MalformedJSONError)
+		return c.JSON(400, apierror.MalformedJSONError)
 	}
 
 	note, err := n.NoteService.CreateNote(&req)
@@ -50,7 +51,7 @@ func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		errResp := service.NewError(400, "ID is not a number")
+		errResp := apierror.NewError(400, "ID is not a number")
 		return c.JSON(errResp.Status, errResp)
 	}
 

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"regexp"
 	"simplenotes/internal/domain/entity"
+	"simplenotes/internal/utils"
+	"simplenotes/internal/utils/apierror"
 	"strings"
 )
 
@@ -48,11 +50,11 @@ func NewNoteService(noteRepo NoteRepository, validate *validator.Validate) *Defa
 	return &DefaultNoteService{NoteRepo: noteRepo, Validate: validate}
 }
 
-func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *APIError) {
+func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *apierror.APIError) {
 	notes, err := n.NoteRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
-		return nil, InternalServerError
+		return nil, apierror.InternalServerError
 	}
 
 	resp := make([]*NoteResponse, len(notes))
@@ -62,9 +64,9 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *APIError) {
 	return resp, nil
 }
 
-func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *APIError) {
+func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *apierror.APIError) {
 	if err := n.Validate.Struct(req); err != nil {
-		return nil, NewError(http.StatusBadRequest, err.Error())
+		return nil, apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 
 	req.Tags = sanitizeAliases(req.Tags)
@@ -73,7 +75,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *APIEr
 		return nil, apierr
 	}
 
-	now := NowUTC()
+	now := utils.NowUTC()
 	note := &entity.Note{
 		Name:      req.Name,
 		Content:   req.Content,
@@ -85,31 +87,31 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *APIEr
 	err := n.NoteRepo.Save(note)
 	if err != nil {
 		log.Errorf("failed to create note: %v", err)
-		return nil, InternalServerError
+		return nil, apierror.InternalServerError
 	}
 	return toNoteResponse(note), nil
 }
 
-func (n *DefaultNoteService) DeleteNote(noteId int) *APIError {
+func (n *DefaultNoteService) DeleteNote(noteId int) *apierror.APIError {
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 
 	if note == nil {
-		return NotFoundError
+		return apierror.NotFoundError
 	}
 
 	err = n.NoteRepo.Delete(note)
 	if err != nil {
 		log.Errorf("failed to delete note: %v", err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 	return nil
 }
 
-func validateAliases(vals []string) *APIError {
+func validateAliases(vals []string) *apierror.APIError {
 	for _, val := range vals {
 		if err := validateAlias(val); err != nil {
 			return err
@@ -117,16 +119,16 @@ func validateAliases(vals []string) *APIError {
 	}
 
 	if hasDuplicates(vals) {
-		return DuplicateAliasError
+		return apierror.DuplicateAliasError
 	}
 	return nil
 }
 
-func validateAlias(val string) *APIError {
+func validateAlias(val string) *apierror.APIError {
 	size := len(val)
 
 	if size < MinAliasLength || size > MaxAliasLength {
-		return NewAliasLengthError(val, MinAliasLength, MaxAliasLength)
+		return apierror.NewAliasLengthError(val, MinAliasLength, MaxAliasLength)
 	}
 	return nil
 }
@@ -159,7 +161,7 @@ func toNoteResponse(note *entity.Note) *NoteResponse {
 		Content:     note.Content,
 		Tags:        strings.Split(note.Tags, " "),
 		CreatedByID: note.CreatedByID,
-		CreatedAt:   FormatEpoch(note.CreatedAt),
-		UpdatedAt:   FormatEpoch(note.UpdatedAt),
+		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
+		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
 	}
 }

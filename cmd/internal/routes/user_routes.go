@@ -4,16 +4,17 @@ import (
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"simplenotes/internal/service"
+	"simplenotes/internal/utils/apierror"
 	"strconv"
 )
 
 type UserService interface {
-	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, *service.APIError)
-	GetUser(id int) (*service.UserResponse, *service.APIError)
-	CreateUser(req *service.CreateUserRequest) *service.APIError
-	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, *service.APIError)
-	ConfirmSignup(req *service.ConfirmSignupRequest) *service.APIError
-	ResendConfirmation(req *service.ResendConfirmRequest) *service.APIError
+	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, *apierror.APIError)
+	GetUser(id int) (*service.UserResponse, *apierror.APIError)
+	CreateUser(req *service.CreateUserRequest) *apierror.APIError
+	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, *apierror.APIError)
+	ConfirmSignup(req *service.ConfirmSignupRequest) *apierror.APIError
+	ResendConfirmation(req *service.ResendConfirmRequest) *apierror.APIError
 }
 
 type DefaultUserRoute struct {
@@ -27,7 +28,7 @@ func NewUserDefault(userService UserService) *DefaultUserRoute {
 func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
 	var req service.QueryUsersRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, service.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
 	}
 
 	users, err := u.UserService.QueryUsers(&req)
@@ -43,7 +44,7 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 	rawId := c.Request().PathValue("id")
 	id, err := strconv.Atoi(rawId)
 	if err != nil {
-		apierr := service.NewInvalidParamTypeError("id", "int32")
+		apierr := apierror.NewInvalidParamTypeError("id", "int32")
 		return c.JSON(apierr.Status, apierr)
 	}
 
@@ -57,7 +58,7 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 	var req service.CreateUserRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, service.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
 	}
 
 	err := u.UserService.CreateUser(&req)
@@ -70,7 +71,7 @@ func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 	var req service.UserLoginRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, service.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
 	}
 
 	resp, apierr := u.UserService.Login(&req)
@@ -83,7 +84,7 @@ func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 	var req service.ConfirmSignupRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, service.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
 	}
 
 	apierr := u.UserService.ConfirmSignup(&req)
@@ -96,7 +97,7 @@ func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 func (u *DefaultUserRoute) ResendConfirmation(c echo.Context) error {
 	var req service.ResendConfirmRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, service.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
 	}
 
 	apierr := u.UserService.ResendConfirmation(&req)

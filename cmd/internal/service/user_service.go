@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"simplenotes/internal/domain/entity"
 	cognitoclient "simplenotes/internal/infrastructure/aws/cognito"
+	"simplenotes/internal/utils"
+	"simplenotes/internal/utils/apierror"
 )
 
 type UserRepository interface {
@@ -64,15 +66,15 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	return &UserService{UserRepo: userRepo, Validate: validate, Cognito: cogClient}
 }
 
-func (u *UserService) QueryUsers(req *QueryUsersRequest) ([]*UserResponse, *APIError) {
+func (u *UserService) QueryUsers(req *QueryUsersRequest) ([]*UserResponse, *apierror.APIError) {
 	if err := u.Validate.Struct(req); err != nil {
-		return nil, NewError(http.StatusBadRequest, err.Error())
+		return nil, apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 
 	users, err := u.UserRepo.FindAllInIDs(req.IDs)
 	if err != nil {
 		log.Errorf("failed to fetch users: %v", err)
-		return nil, InternalServerError
+		return nil, apierror.InternalServerError
 	}
 
 	resp := make([]*UserResponse, len(users))
@@ -82,19 +84,19 @@ func (u *UserService) QueryUsers(req *QueryUsersRequest) ([]*UserResponse, *APIE
 	return resp, nil
 }
 
-func (u *UserService) GetUser(id int) (*UserResponse, *APIError) {
+func (u *UserService) GetUser(id int) (*UserResponse, *apierror.APIError) {
 	if id < 1 {
-		return nil, InvalidIDError
+		return nil, apierror.InvalidIDError
 	}
 
 	user, err := u.UserRepo.FindByID(id)
 	if err != nil {
 		log.Errorf("failed to fetch user for ID %d: %v", id, err)
-		return nil, InternalServerError
+		return nil, apierror.InternalServerError
 	}
 
 	if user == nil {
-		return nil, NotFoundError
+		return nil, apierror.NotFoundError
 	}
 
 	resp := toUserResponse(user)
@@ -103,9 +105,9 @@ func (u *UserService) GetUser(id int) (*UserResponse, *APIError) {
 
 // CreateUser creates a new user on Cognito (as well as in our database),
 // and sends a verification code to the user's email address.
-func (u *UserService) CreateUser(req *CreateUserRequest) *APIError {
+func (u *UserService) CreateUser(req *CreateUserRequest) *apierror.APIError {
 	if err := u.Validate.Struct(req); err != nil {
-		return NewError(http.StatusBadRequest, err.Error())
+		return apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 
 	cogUser := &cognitoclient.User{Email: req.Email, Password: req.Password}
@@ -115,7 +117,7 @@ func (u *UserService) CreateUser(req *CreateUserRequest) *APIError {
 	}
 
 	// This is our user, in our database <3
-	now := NowUTC()
+	now := utils.NowUTC()
 	user := &entity.User{
 		SubUUID:       uuid,
 		Username:      req.Username,
@@ -132,14 +134,14 @@ func (u *UserService) CreateUser(req *CreateUserRequest) *APIError {
 		// but better safe than sorry?
 		revert()
 		log.Errorf("failed to create user: %v", err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 	return nil
 }
 
-func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, *APIError) {
+func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, *apierror.APIError) {
 	if err := u.Validate.Struct(req); err != nil {
-		return nil, NewError(http.StatusBadRequest, err.Error())
+		return nil, apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 	credentials := &cognitoclient.UserLogin{
 		Email:    req.Email,
@@ -153,9 +155,9 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, *APIErro
 	return &UserLoginResponse{AccessToken: auth.AccessToken, IDToken: auth.IDToken}, nil
 }
 
-func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) *APIError {
+func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) *apierror.APIError {
 	if err := u.Validate.Struct(req); err != nil {
-		return NewError(http.StatusBadRequest, err.Error())
+		return apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 
 	apierr := isUserConfirmed(u.UserRepo, req.Email)
@@ -175,9 +177,9 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) *APIError {
 	return nil
 }
 
-func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) *APIError {
+func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) *apierror.APIError {
 	if err := u.Validate.Struct(req); err != nil {
-		return NewError(http.StatusBadRequest, err.Error())
+		return apierror.NewError(http.StatusBadRequest, err.Error())
 	}
 
 	apierr := isUserConfirmed(u.UserRepo, req.Email)
@@ -192,19 +194,19 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) *APIError {
 	return nil
 }
 
-func isUserConfirmed(repo UserRepository, email string) *APIError {
+func isUserConfirmed(repo UserRepository, email string) *apierror.APIError {
 	user, err := repo.FindByEmail(email)
 	if err != nil {
 		log.Errorf("failed to fetch user for email %s: %v", email, err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 
 	if user == nil {
-		return IDPUserNotFoundError
+		return apierror.IDPUserNotFoundError
 	}
 
 	if user.EmailVerified {
-		return UserAlreadyConfirmedError
+		return apierror.UserAlreadyConfirmedError
 	}
 	return nil
 }
@@ -222,7 +224,7 @@ func isUserConfirmed(repo UserRepository, email string) *APIError {
 //
 // Parameters:
 //   - req: a pointer to a cognitoclient.User struct containing the user's signup information.
-func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, *APIError, func()) {
+func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, *apierror.APIError, func()) {
 	revert := func() {
 		_ = cogClient.AdminDeleteUser(req.Email)
 	}
@@ -234,18 +236,18 @@ func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 
 	switch {
 	case errors.Is(err, &types.InvalidPasswordException{}):
-		return "", IDPInvalidPasswordError, revert
+		return "", apierror.IDPInvalidPasswordError, revert
 
 	case errors.Is(err, &types.UsernameExistsException{}):
-		return "", IDPExistingEmailError, revert
+		return "", apierror.IDPExistingEmailError, revert
 
 	default:
 		log.Errorf("failed to signup user: %v", err)
-		return "", InternalServerError, revert
+		return "", apierror.InternalServerError, revert
 	}
 }
 
-func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, *APIError) {
+func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, *apierror.APIError) {
 	auth, err := cogClient.SignIn(req)
 	if err == nil {
 		return auth, nil
@@ -253,21 +255,21 @@ func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 
 	switch {
 	case errors.Is(err, &types.UserNotFoundException{}):
-		return nil, IDPUserNotFoundError
+		return nil, apierror.IDPUserNotFoundError
 
 	case errors.Is(err, &types.UserNotConfirmedException{}):
-		return nil, IDPUserNotConfirmedError
+		return nil, apierror.IDPUserNotConfirmedError
 
 	case errors.Is(err, &types.NotAuthorizedException{}):
-		return nil, IDPCredentialsMismatchError
+		return nil, apierror.IDPCredentialsMismatchError
 
 	default:
 		log.Errorf("failed to signin user (%s): %v", req.Email, err)
-		return nil, InternalServerError
+		return nil, apierror.InternalServerError
 	}
 }
 
-func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserConfirmation) *APIError {
+func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserConfirmation) *apierror.APIError {
 	err := cogClient.ConfirmAccount(req)
 	if err == nil {
 		return nil
@@ -275,21 +277,21 @@ func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cog
 
 	switch {
 	case errors.Is(err, &types.CodeMismatchException{}):
-		return IDPConfirmCodeMismatchError
+		return apierror.IDPConfirmCodeMismatchError
 
 	case errors.Is(err, &types.ExpiredCodeException{}):
-		return IDPConfirmCodeExpiredError
+		return apierror.IDPConfirmCodeExpiredError
 
 	case errors.Is(err, &types.UserNotFoundException{}):
-		return IDPUserNotFoundError
+		return apierror.IDPUserNotFoundError
 
 	default:
 		log.Errorf("failed to confirm user (%s): %v", req.Email, err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 }
 
-func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string) *APIError {
+func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string) *apierror.APIError {
 	err := cogClient.ResendConfirmation(email)
 	if err == nil {
 		return nil
@@ -297,14 +299,14 @@ func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string)
 
 	switch {
 	case errors.Is(err, &types.UserNotFoundException{}):
-		return IDPUserNotFoundError
+		return apierror.IDPUserNotFoundError
 
 	case errors.Is(err, &types.InvalidParameterException{}):
-		return IDPInvalidParameterError
+		return apierror.IDPInvalidParameterError
 
 	default:
 		log.Errorf("failed to resend confirmation code to email (%s): %v", email, err)
-		return InternalServerError
+		return apierror.InternalServerError
 	}
 }
 

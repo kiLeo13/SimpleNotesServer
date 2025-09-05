@@ -11,7 +11,7 @@ import (
 	cognitoclient "simplenotes/internal/infrastructure/aws/cognito"
 	"simplenotes/internal/routes"
 	"simplenotes/internal/service"
-	"simplenotes/internal/validators"
+	"simplenotes/internal/utils/validators"
 )
 
 func main() {
