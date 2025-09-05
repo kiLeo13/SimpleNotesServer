@@ -118,6 +118,7 @@ func (u *UserService) CreateUser(req *CreateUserRequest) *APIError {
 	user := &entity.User{
 		SubUUID:       uuid,
 		Username:      req.Username,
+		Email:         req.Email,
 		EmailVerified: false,
 		IsAdmin:       false,
 		CreatedAt:     now,
