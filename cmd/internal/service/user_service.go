@@ -13,6 +13,7 @@ import (
 type UserRepository interface {
 	FindAllInIDs(ids []int) ([]*entity.User, error)
 	FindByID(id int) (*entity.User, error)
+	FindByEmail(email string) (*entity.User, error)
 	Save(user *entity.User) error
 }
 
@@ -156,12 +157,18 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) *APIError {
 	if err := u.Validate.Struct(req); err != nil {
 		return NewError(http.StatusBadRequest, err.Error())
 	}
+
+	apierr := isUserConfirmed(u.UserRepo, req.Email)
+	if apierr != nil {
+		return apierr
+	}
+
 	confirms := &cognitoclient.UserConfirmation{
 		Email: req.Email,
 		Code:  req.Code,
 	}
 
-	apierr := handleSignupConfirmation(u.Cognito, confirms)
+	apierr = handleSignupConfirmation(u.Cognito, confirms)
 	if apierr != nil {
 		return apierr
 	}
@@ -173,9 +180,31 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) *APIError {
 		return NewError(http.StatusBadRequest, err.Error())
 	}
 
-	apierr := handleConfirmResend(u.Cognito, req.Email)
+	apierr := isUserConfirmed(u.UserRepo, req.Email)
 	if apierr != nil {
 		return apierr
+	}
+
+	apierr = handleConfirmResend(u.Cognito, req.Email)
+	if apierr != nil {
+		return apierr
+	}
+	return nil
+}
+
+func isUserConfirmed(repo UserRepository, email string) *APIError {
+	user, err := repo.FindByEmail(email)
+	if err != nil {
+		log.Errorf("failed to fetch user for email %s: %v", email, err)
+		return InternalServerError
+	}
+
+	if user == nil {
+		return IDPUserNotFoundError
+	}
+
+	if user.EmailVerified {
+		return UserAlreadyConfirmedError
 	}
 	return nil
 }

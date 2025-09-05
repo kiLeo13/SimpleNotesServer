@@ -21,6 +21,7 @@ var (
 	/*
 	 * Used for authentications
 	 */
+	UserAlreadyConfirmedError   = NewError(400, "User is already confirmed")
 	IDPInvalidPasswordError     = NewError(400, "Provided password does not meet requirements")
 	IDPExistingEmailError       = NewError(400, "Email already exists")
 	IDPUserNotFoundError        = NewError(404, "User not found")

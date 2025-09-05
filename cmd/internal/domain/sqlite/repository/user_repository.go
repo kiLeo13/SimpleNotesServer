@@ -40,6 +40,19 @@ func (u *DefaultUserRepository) FindByID(id int) (*entity.User, error) {
 	return &user, nil
 }
 
+func (u *DefaultUserRepository) FindByEmail(email string) (*entity.User, error) {
+	var user entity.User
+	err := u.db.Where("email = ?", email).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (u *DefaultUserRepository) Save(user *entity.User) error {
 	return u.db.Save(user).Error
 }
