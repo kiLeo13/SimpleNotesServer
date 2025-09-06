@@ -6,38 +6,54 @@ import (
 	"unicode"
 )
 
-const (
-	PasswordMinLength = 8
-	PasswordMaxLength = 64
-)
-
 var specialRegex = regexp.MustCompile(`[\\^$*.\[\]{}()?"!@#%&/\\,><':;|_~` + "`" + `=+\-]`)
 
-func PasswordValidator(fl validator.FieldLevel) bool {
-	password, ok := fl.Field().Interface().(string)
+func HasUpper(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
 	if !ok {
 		return false
 	}
 
-	length := len(password)
-	if length < PasswordMinLength || length > PasswordMaxLength {
+	for _, ch := range val {
+		if unicode.IsUpper(ch) {
+			return true
+		}
+	}
+	return false
+}
+
+func HasLower(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
 		return false
 	}
 
-	hasSpecial := specialRegex.MatchString(password)
-	var hasUpper, hasLower, hasDigit bool
-
-	for _, ch := range password {
-		switch {
-		case unicode.IsUpper(ch):
-			hasUpper = true
-
-		case unicode.IsLower(ch):
-			hasLower = true
-
-		case unicode.IsDigit(ch):
-			hasDigit = true
+	for _, ch := range val {
+		if unicode.IsLower(ch) {
+			return true
 		}
 	}
-	return hasUpper && hasLower && hasDigit && hasSpecial
+	return false
+}
+
+func HasDigit(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
+		return false
+	}
+
+	for _, ch := range val {
+		if unicode.IsDigit(ch) {
+			return true
+		}
+	}
+	return false
+}
+
+func HasSpecial(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
+		return false
+	}
+	return specialRegex.MatchString(val)
 }

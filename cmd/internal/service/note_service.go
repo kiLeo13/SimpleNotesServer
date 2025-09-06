@@ -3,7 +3,6 @@ package service
 import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
-	"net/http"
 	"regexp"
 	"simplenotes/internal/domain/entity"
 	"simplenotes/internal/utils"
@@ -50,7 +49,7 @@ func NewNoteService(noteRepo NoteRepository, validate *validator.Validate) *Defa
 	return &DefaultNoteService{NoteRepo: noteRepo, Validate: validate}
 }
 
-func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *apierror.APIError) {
+func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorResponse) {
 	notes, err := n.NoteRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
@@ -64,9 +63,9 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, *apierror.APIError)
 	return resp, nil
 }
 
-func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *apierror.APIError) {
+func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, apierror.ErrorResponse) {
 	if err := n.Validate.Struct(req); err != nil {
-		return nil, apierror.NewError(http.StatusBadRequest, err.Error())
+		return nil, apierror.FromValidationError(err)
 	}
 
 	req.Tags = sanitizeAliases(req.Tags)
@@ -92,7 +91,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, *apier
 	return toNoteResponse(note), nil
 }
 
-func (n *DefaultNoteService) DeleteNote(noteId int) *apierror.APIError {
+func (n *DefaultNoteService) DeleteNote(noteId int) apierror.ErrorResponse {
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
@@ -111,7 +110,7 @@ func (n *DefaultNoteService) DeleteNote(noteId int) *apierror.APIError {
 	return nil
 }
 
-func validateAliases(vals []string) *apierror.APIError {
+func validateAliases(vals []string) apierror.ErrorResponse {
 	for _, val := range vals {
 		if err := validateAlias(val); err != nil {
 			return err
@@ -124,7 +123,7 @@ func validateAliases(vals []string) *apierror.APIError {
 	return nil
 }
 
-func validateAlias(val string) *apierror.APIError {
+func validateAlias(val string) apierror.ErrorResponse {
 	size := len(val)
 
 	if size < MinAliasLength || size > MaxAliasLength {

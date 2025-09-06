@@ -71,5 +71,8 @@ func main() {
 }
 
 func registerValidators(validate *validator.Validate) {
-	_ = validate.RegisterValidation("x-password", validators.PasswordValidator, false)
+	_ = validate.RegisterValidation("hasupper", validators.HasUpper, false)
+	_ = validate.RegisterValidation("haslower", validators.HasLower, false)
+	_ = validate.RegisterValidation("hasdigit", validators.HasDigit, false)
+	_ = validate.RegisterValidation("hasspecial", validators.HasSpecial, false)
 }

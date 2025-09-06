@@ -9,12 +9,12 @@ import (
 )
 
 type UserService interface {
-	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, *apierror.APIError)
-	GetUser(id int) (*service.UserResponse, *apierror.APIError)
-	CreateUser(req *service.CreateUserRequest) *apierror.APIError
-	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, *apierror.APIError)
-	ConfirmSignup(req *service.ConfirmSignupRequest) *apierror.APIError
-	ResendConfirmation(req *service.ResendConfirmRequest) *apierror.APIError
+	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, apierror.ErrorResponse)
+	GetUser(id int) (*service.UserResponse, apierror.ErrorResponse)
+	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
+	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
+	ConfirmSignup(req *service.ConfirmSignupRequest) apierror.ErrorResponse
+	ResendConfirmation(req *service.ResendConfirmRequest) apierror.ErrorResponse
 }
 
 type DefaultUserRoute struct {
@@ -33,7 +33,7 @@ func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
 
 	users, err := u.UserService.QueryUsers(&req)
 	if err != nil {
-		return c.JSON(err.Status, err)
+		return c.JSON(err.Code(), err)
 	}
 
 	resp := echo.Map{"users": users}
@@ -50,7 +50,7 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 
 	user, apierr := u.UserService.GetUser(id)
 	if apierr != nil {
-		return c.JSON(apierr.Status, apierr)
+		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.JSON(http.StatusOK, user)
 }
@@ -63,7 +63,7 @@ func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 
 	err := u.UserService.CreateUser(&req)
 	if err != nil {
-		return c.JSON(err.Status, err)
+		return c.JSON(err.Code(), err)
 	}
 	return c.NoContent(http.StatusCreated)
 }
@@ -76,7 +76,7 @@ func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 
 	resp, apierr := u.UserService.Login(&req)
 	if apierr != nil {
-		return c.JSON(apierr.Status, apierr)
+		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.JSON(http.StatusOK, resp)
 }
@@ -89,7 +89,7 @@ func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 
 	apierr := u.UserService.ConfirmSignup(&req)
 	if apierr != nil {
-		return c.JSON(apierr.Status, apierr)
+		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.NoContent(http.StatusOK)
 }
@@ -102,7 +102,7 @@ func (u *DefaultUserRoute) ResendConfirmation(c echo.Context) error {
 
 	apierr := u.UserService.ResendConfirmation(&req)
 	if apierr != nil {
-		return c.JSON(apierr.Status, apierr)
+		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.NoContent(http.StatusOK)
 }

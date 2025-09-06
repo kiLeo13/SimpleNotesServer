@@ -9,9 +9,9 @@ import (
 )
 
 type NoteService interface {
-	GetAllNotes() ([]*service.NoteResponse, *apierror.APIError)
-	CreateNote(req *service.NoteRequest) (*service.NoteResponse, *apierror.APIError)
-	DeleteNote(noteId int) *apierror.APIError
+	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
+	CreateNote(req *service.NoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
+	DeleteNote(noteId int) apierror.ErrorResponse
 }
 
 type DefaultNoteRoute struct {
@@ -25,7 +25,7 @@ func NewNoteDefault(noteService NoteService) *DefaultNoteRoute {
 func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
 	notes, err := n.NoteService.GetAllNotes()
 	if err != nil {
-		return c.JSON(err.Status, err)
+		return c.JSON(err.Code(), err)
 	}
 
 	resp := echo.Map{
@@ -42,7 +42,7 @@ func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
 
 	note, err := n.NoteService.CreateNote(&req)
 	if err != nil {
-		return c.JSON(err.Status, err)
+		return c.JSON(err.Code(), err)
 	}
 	return c.JSON(http.StatusCreated, &note)
 }
@@ -51,13 +51,13 @@ func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		errResp := apierror.NewError(400, "ID is not a number")
+		errResp := apierror.NewSimple(400, "ID is not a number")
 		return c.JSON(errResp.Status, errResp)
 	}
 
 	serr := n.NoteService.DeleteNote(id)
 	if serr != nil {
-		return c.JSON(serr.Status, serr)
+		return c.JSON(serr.Code(), serr)
 	}
 	return c.NoContent(http.StatusOK)
 }
