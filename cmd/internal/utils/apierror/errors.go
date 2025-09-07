@@ -119,11 +119,6 @@ func NewStructured(code int) *StructuredError {
 	}
 }
 
-func NewAliasLengthError(alias string, min, max int) *APIError {
-	return NewSimple(http.StatusBadRequest, "Notes aliases must be in range of [%d - %d], provided (%d): %s",
-		min, max, len(alias), alias)
-}
-
 func NewInvalidParamTypeError(name, dataType string) *APIError {
 	return NewSimple(http.StatusBadRequest, "Parameter '%s' has invalid type, expected: %s", name, dataType)
 }
