@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -14,4 +17,9 @@ func NowUTC() int64 {
 	return time.Now().
 		UTC().
 		UnixMilli()
+}
+
+func CheckFileExt(fileName string, valid []string) (string, bool) {
+	ext := strings.ToLower(filepath.Ext(fileName))
+	return ext, slices.Contains(valid, ext)
 }
