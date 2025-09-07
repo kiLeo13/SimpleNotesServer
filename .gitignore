@@ -13,11 +13,9 @@ node_modules/
 # Workspace files
 go.work
 go.work.sum
-note_modules/
 
 .env
 .idea/
-.vscode/
 
 # Database files
 *.db
