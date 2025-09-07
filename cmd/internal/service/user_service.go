@@ -15,6 +15,7 @@ type UserRepository interface {
 	FindAllInIDs(ids []int) ([]*entity.User, error)
 	FindByID(id int) (*entity.User, error)
 	FindByEmail(email string) (*entity.User, error)
+	ExistsByEmail(email string) (bool, error)
 	Save(user *entity.User) error
 }
 
@@ -109,6 +110,16 @@ func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse 
 		return apierror.FromValidationError(err)
 	}
 
+	found, err := u.UserRepo.ExistsByEmail(req.Email)
+	if err != nil {
+		log.Errorf("failed to check if user already exists: %v", err)
+		return apierror.InternalServerError
+	}
+
+	if found {
+		return apierror.UserAlreadyExistsError
+	}
+
 	cogUser := &cognitoclient.User{Email: req.Email, Password: req.Password}
 	uuid, apierr, revert := handleUserSignup(u.Cognito, cogUser)
 	if apierr != nil {
@@ -127,7 +138,7 @@ func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse 
 		UpdatedAt:     now,
 	}
 
-	err := u.UserRepo.Save(user)
+	err = u.UserRepo.Save(user)
 	if err != nil {
 		// Well... for our case, I have no idea how can SQLite fail here,
 		// but better safe than sorry?

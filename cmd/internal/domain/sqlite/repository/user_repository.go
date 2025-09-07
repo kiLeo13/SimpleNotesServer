@@ -53,6 +53,17 @@ func (u *DefaultUserRepository) FindByEmail(email string) (*entity.User, error) 
 	return &user, nil
 }
 
+func (u *DefaultUserRepository) ExistsByEmail(email string) (bool, error) {
+	var exists bool
+	err := u.db.
+		Raw("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email).
+		Scan(&exists).Error
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (u *DefaultUserRepository) Save(user *entity.User) error {
 	return u.db.Save(user).Error
 }

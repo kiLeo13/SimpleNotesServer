@@ -52,6 +52,7 @@ var (
 	/*
 	 * Used for authentications
 	 */
+	UserAlreadyExistsError      = NewSimple(400, "User already exists")
 	UserAlreadyConfirmedError   = NewSimple(400, "User is already confirmed")
 	IDPInvalidPasswordError     = NewSimple(400, "Provided password does not meet requirements")
 	IDPExistingEmailError       = NewSimple(400, "Email already exists")
