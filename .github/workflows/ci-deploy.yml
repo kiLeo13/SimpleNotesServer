@@ -27,5 +27,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/simplenotes:latest
-            ghcr.io/${{ github.repository_owner }}/simplenotes:${{ github.sha }}
+            OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            REPO=$(basename "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+            ghcr.io/$OWNER/$REPO:latest
+            ghcr.io/$OWNER/$REPO:${{ github.sha }}
