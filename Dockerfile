@@ -8,14 +8,11 @@ WORKDIR /src
 
 COPY go.mod go.sum ./
 
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 
 COPY . .
 
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=${CGO_ENABLED} \
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=${CGO_ENABLED} \
     go build -trimpath -ldflags="-s -w" -o /app/server ./cmd/api
 
 
