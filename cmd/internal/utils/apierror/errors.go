@@ -127,3 +127,11 @@ func NewAliasLengthError(alias string, min, max int) *APIError {
 func NewInvalidParamTypeError(name, dataType string) *APIError {
 	return NewSimple(http.StatusBadRequest, "Parameter '%s' has invalid type, expected: %s", name, dataType)
 }
+
+func NewNoteContentTooLargeError(max int64) *APIError {
+	return NewSimple(http.StatusBadRequest, "Note content is too large, max: %d", max)
+}
+
+func NewInvalidFileExtError(ext string) *APIError {
+	return NewSimple(http.StatusBadRequest, "Invalid file extension: %s", ext)
+}
