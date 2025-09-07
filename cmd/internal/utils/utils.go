@@ -2,6 +2,7 @@ package utils
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -22,4 +23,35 @@ func NowUTC() int64 {
 func CheckFileExt(fileName string, valid []string) (string, bool) {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	return ext, slices.Contains(valid, ext)
+}
+
+func Sanitize(o any) {
+	v := reflect.ValueOf(o)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		panic("sanitize: expected pointer to struct")
+	}
+
+	v = v.Elem()
+	if v.Kind() != reflect.Struct {
+		panic("sanitize: expected struct")
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		switch field.Kind() {
+		case reflect.String:
+			field.SetString(sanitizeString(field.String()))
+
+		case reflect.Slice:
+			if field.Type().Elem().Kind() == reflect.String {
+				for j := 0; j < field.Len(); j++ {
+					field.Index(j).SetString(sanitizeString(field.Index(j).String()))
+				}
+			}
+		}
+	}
+}
+
+func sanitizeString(s string) string {
+	return strings.TrimSpace(s)
 }
