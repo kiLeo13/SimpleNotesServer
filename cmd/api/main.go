@@ -94,7 +94,7 @@ func registerValidators(validate *validator.Validate) {
 
 func loadProdEnv() {
 	ctx := context.Background()
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-2"))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
