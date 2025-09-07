@@ -91,6 +91,10 @@ func FromValidationError(err error) *StructuredError {
 			problems[field] = append(problems[field], "Value must have at least one number")
 		case "hasspecial":
 			problems[field] = append(problems[field], "Value must have at least one special character")
+		case "nospaces":
+			problems[field] = append(problems[field], "Value cannot contain spaces")
+		case "nodupes":
+			problems[field] = append(problems[field], "Value cannot contain duplicate entries")
 		case "email":
 			problems[field] = append(problems[field], "Value must be a valid email address")
 
