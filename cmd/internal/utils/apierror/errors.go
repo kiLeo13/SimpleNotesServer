@@ -45,9 +45,10 @@ var (
 	MalformedJSONError  = NewSimple(400, "Malformed JSON body")
 	InternalServerError = NewSimple(500, "Internal server error")
 
-	NotFoundError       = NewSimple(404, "Resource not found")
-	DuplicateAliasError = NewSimple(400, "Cannot have duplicate aliases")
-	InvalidIDError      = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
+	NotFoundError        = NewSimple(404, "Resource not found")
+	DuplicateAliasError  = NewSimple(400, "Cannot have duplicate aliases")
+	InvalidIDError       = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
+	MissingNoteFileError = NewSimple(400, "Content file is required")
 
 	/*
 	 * Used for authentications
