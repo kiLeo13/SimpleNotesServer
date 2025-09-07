@@ -4,6 +4,7 @@ go 1.23.0
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.31.6
+	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.13.4
 )
 
@@ -18,7 +19,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.2 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 )
 
 require (
