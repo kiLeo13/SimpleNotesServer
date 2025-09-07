@@ -86,10 +86,12 @@ func main() {
 }
 
 func registerValidators(validate *validator.Validate) {
-	_ = validate.RegisterValidation("hasupper", validators.HasUpper, false)
-	_ = validate.RegisterValidation("haslower", validators.HasLower, false)
-	_ = validate.RegisterValidation("hasdigit", validators.HasDigit, false)
-	_ = validate.RegisterValidation("hasspecial", validators.HasSpecial, false)
+	_ = validate.RegisterValidation("hasupper", validators.HasUpper)
+	_ = validate.RegisterValidation("haslower", validators.HasLower)
+	_ = validate.RegisterValidation("hasdigit", validators.HasDigit)
+	_ = validate.RegisterValidation("hasspecial", validators.HasSpecial)
+	_ = validate.RegisterValidation("nodupes", validators.NoDupes)
+	_ = validate.RegisterValidation("nospaces", validators.NoWhiteSpaces)
 }
 
 func loadProdEnv() {
