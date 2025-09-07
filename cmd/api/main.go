@@ -1,27 +1,39 @@
 package main
 
 import (
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/gommon/log"
 	"os"
 	"simplenotes/internal/domain/sqlite"
 	"simplenotes/internal/domain/sqlite/repository"
-	cognitoclient "simplenotes/internal/infrastructure/aws/cognito"
+	"simplenotes/internal/infrastructure/aws/cognito"
 	"simplenotes/internal/routes"
 	"simplenotes/internal/service"
 	"simplenotes/internal/utils/validators"
 )
 
+const envVarsPrefix = "/simplenotes/prod/"
+
 func main() {
 	validate := validator.New()
 	registerValidators(validate)
 
-	// Init env vars
-	err := godotenv.Load()
-	if err != nil {
-		panic(err)
+	// Loads env vars depending on environment
+	if os.Getenv("GO_ENV") == "production" {
+		loadProdEnv() // AWS SSM Parameter Store
+	} else {
+		// Loads from .env
+		err := godotenv.Load()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// Init SQLite
@@ -65,6 +77,9 @@ func main() {
 	e.POST("/api/users/confirms", userRoutes.ConfirmSignup)
 	e.POST("/api/users/confirms/resend", userRoutes.ResendConfirmation)
 
+	// Docker Compose healthcheck
+	e.GET("/health", healthCheckRoute)
+
 	if err := e.Start(":7070"); err != nil {
 		panic(err)
 	}
@@ -75,4 +90,38 @@ func registerValidators(validate *validator.Validate) {
 	_ = validate.RegisterValidation("haslower", validators.HasLower, false)
 	_ = validate.RegisterValidation("hasdigit", validators.HasDigit, false)
 	_ = validate.RegisterValidation("hasspecial", validators.HasSpecial, false)
+}
+
+func loadProdEnv() {
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatalf("unable to load SDK config, %v", err)
+	}
+
+	client := ssm.NewFromConfig(cfg)
+	out, err := client.GetParametersByPath(ctx, &ssm.GetParametersByPathInput{
+		Path:           aws.String(envVarsPrefix),
+		WithDecryption: aws.Bool(true),
+		Recursive:      aws.Bool(true),
+	})
+	if err != nil {
+		log.Fatalf("unable to load prod environment, %v", err)
+	}
+
+	prefixLength := len(envVarsPrefix)
+	// Export vars
+	for _, param := range out.Parameters {
+		key := (*param.Name)[prefixLength:]
+		value := *param.Value
+		enverr := os.Setenv(key, value)
+		if enverr != nil {
+			log.Fatalf("unable to set environment variable, %v", enverr)
+		}
+	}
+	log.Debugf("loaded %d prod environment variables", len(out.Parameters))
+}
+
+func healthCheckRoute(c echo.Context) error {
+	return c.String(200, "OK")
 }

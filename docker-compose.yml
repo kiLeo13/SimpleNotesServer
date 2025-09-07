@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/kileo13/simplenotesserver:latest
+    container_name: simplenotes_app
+    restart: unless-stopped
+    ports:
+      - "7070:7070"
+    environment:
+      - GO_ENV=production
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7070/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: --label-enable --interval 300
