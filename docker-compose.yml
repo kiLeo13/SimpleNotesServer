@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   app:
-    image: ghcr.io/kileo13/simplenotesserver:latest
+    image: ghcr.io/kileo13/simplenotes:latest
     container_name: simplenotes_app
     restart: unless-stopped
     ports:
