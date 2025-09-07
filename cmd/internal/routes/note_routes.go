@@ -3,8 +3,8 @@ package routes
 import (
 	"github.com/labstack/echo/v4"
 	"net/http"
-	"simplenotes/internal/service"
-	"simplenotes/internal/utils/apierror"
+	"simplenotes/cmd/internal/service"
+	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
 )
 

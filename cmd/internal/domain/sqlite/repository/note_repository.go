@@ -3,7 +3,7 @@ package repository
 import (
 	"errors"
 	"gorm.io/gorm"
-	"simplenotes/internal/domain/entity"
+	"simplenotes/cmd/internal/domain/entity"
 )
 
 type DefaultNoteRepository struct {

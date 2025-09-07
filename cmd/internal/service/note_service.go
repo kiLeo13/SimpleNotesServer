@@ -4,9 +4,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
 	"regexp"
-	"simplenotes/internal/domain/entity"
-	"simplenotes/internal/utils"
-	"simplenotes/internal/utils/apierror"
+	"simplenotes/cmd/internal/domain/entity"
+	"simplenotes/cmd/internal/utils"
+	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
 )
 

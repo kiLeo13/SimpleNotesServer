@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"path/filepath"
-	"simplenotes/internal/domain/entity"
+	"simplenotes/cmd/internal/domain/entity"
 	"time"
 
 	"github.com/glebarez/sqlite"

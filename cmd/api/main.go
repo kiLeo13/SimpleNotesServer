@@ -11,12 +11,12 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	"os"
-	"simplenotes/internal/domain/sqlite"
-	"simplenotes/internal/domain/sqlite/repository"
-	"simplenotes/internal/infrastructure/aws/cognito"
-	"simplenotes/internal/routes"
-	"simplenotes/internal/service"
-	"simplenotes/internal/utils/validators"
+	"simplenotes/cmd/internal/domain/sqlite"
+	"simplenotes/cmd/internal/domain/sqlite/repository"
+	"simplenotes/cmd/internal/infrastructure/aws/cognito"
+	"simplenotes/cmd/internal/routes"
+	"simplenotes/cmd/internal/service"
+	"simplenotes/cmd/internal/utils/validators"
 )
 
 const envVarsPrefix = "/simplenotes/prod/"

@@ -5,10 +5,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
-	"simplenotes/internal/domain/entity"
-	cognitoclient "simplenotes/internal/infrastructure/aws/cognito"
-	"simplenotes/internal/utils"
-	"simplenotes/internal/utils/apierror"
+	"simplenotes/cmd/internal/domain/entity"
+	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
+	"simplenotes/cmd/internal/utils"
+	"simplenotes/cmd/internal/utils/apierror"
 )
 
 type UserRepository interface {
