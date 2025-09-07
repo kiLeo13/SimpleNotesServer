@@ -6,9 +6,6 @@ ARG TARGETARCH=amd64
 ARG CGO_ENABLED=0
 WORKDIR /src
 
-# Defines it as production environment
-ENV GO_ENV=production
-
 COPY go.mod go.sum ./
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
