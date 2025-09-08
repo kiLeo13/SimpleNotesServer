@@ -1,36 +1,40 @@
 package service
 
 import (
+	"fmt"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/gommon/log"
-	"regexp"
+	"io"
+	"mime/multipart"
+	"path/filepath"
 	"simplenotes/cmd/internal/domain/entity"
+	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
 )
 
-const (
-	MinAliasLength = 2
-	MaxAliasLength = 30
-)
+const MaxNoteFileSizeBytes = 30 * 1024 * 1024
 
-var whitespaceRegex = regexp.MustCompile(`\s+`)
+var ValidNoteFileTypes = []string{"txt", "pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
 
 type NoteResponse struct {
 	ID          int      `json:"id"`
 	Name        string   `json:"name"`
 	Content     string   `json:"content"`
 	Tags        []string `json:"tags"`
+	Visibility  string   `json:"visibility"`
+	NoteType    string   `json:"note_type"`
 	CreatedByID int      `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
 }
 
 type NoteRequest struct {
-	Name    string   `json:"name" validate:"required,min=2,max=80"`
-	Tags    []string `json:"tags" validate:"required,max=50"`
-	Content string   `json:"content" validate:"required"`
+	Name       string   `form:"name" validate:"required,min=2,max=80"`
+	Visibility string   `form:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
+	Tags       []string `form:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
 
 type NoteRepository interface {
@@ -42,11 +46,13 @@ type NoteRepository interface {
 
 type DefaultNoteService struct {
 	NoteRepo NoteRepository
+	UserRepo UserRepository
+	S3       storage.S3Client
 	Validate *validator.Validate
 }
 
-func NewNoteService(noteRepo NoteRepository, validate *validator.Validate) *DefaultNoteService {
-	return &DefaultNoteService{NoteRepo: noteRepo, Validate: validate}
+func NewNoteService(noteRepo NoteRepository, userRepo UserRepository, s3 storage.S3Client, validate *validator.Validate) *DefaultNoteService {
+	return &DefaultNoteService{NoteRepo: noteRepo, UserRepo: userRepo, S3: s3, Validate: validate}
 }
 
 func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorResponse) {
@@ -63,27 +69,49 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorRespo
 	return resp, nil
 }
 
-func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, apierror.ErrorResponse) {
-	if err := n.Validate.Struct(req); err != nil {
-		return nil, apierror.FromValidationError(err)
+func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
+	issuer, err := n.UserRepo.FindBySub(issuerId)
+	if err != nil {
+		log.Errorf("failed to check if user %s is admin: %v", issuerId, err)
+		return nil, apierror.InternalServerError
 	}
 
-	req.Tags = sanitizeAliases(req.Tags)
-	apierr := validateAliases(req.Tags)
+	// I don't know how the user can even be nil here, but better safe than sorry?
+	if issuer == nil || !issuer.IsAdmin {
+		return nil, apierror.UserNotAdmin
+	}
+
+	utils.Sanitize(req)
+	if valerr := n.Validate.Struct(req); valerr != nil {
+		return nil, apierror.FromValidationError(valerr)
+	}
+
+	if apierr := checkNoteFile(fileHeader); apierr != nil {
+		return nil, apierr
+	}
+
+	// Here, if the extension represents a `.txt` file, then
+	// "key" will be the raw text inside the file.
+	// Any other file extension will be uploaded to S3 and return the key.
+	key, apierr := handleNoteUpload(n.S3, fileHeader)
 	if apierr != nil {
 		return nil, apierr
 	}
 
+	noteType := resolveNoteType(fileHeader.Filename)
 	now := utils.NowUTC()
 	note := &entity.Note{
-		Name:      req.Name,
-		Content:   req.Content,
-		Tags:      strings.Join(req.Tags, " "),
-		CreatedAt: now,
-		UpdatedAt: now,
+		Name:        req.Name,
+		Content:     key,
+		CreatedByID: issuer.ID,
+		Tags:        strings.Join(req.Tags, " "),
+		Visibility:  req.Visibility,
+		NoteType:    noteType,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
-	err := n.NoteRepo.Save(note)
+	err = n.NoteRepo.Save(note)
 	if err != nil {
 		log.Errorf("failed to create note: %v", err)
 		return nil, apierror.InternalServerError
@@ -91,7 +119,17 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest) (*NoteResponse, apierr
 	return toNoteResponse(note), nil
 }
 
-func (n *DefaultNoteService) DeleteNote(noteId int) apierror.ErrorResponse {
+func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.ErrorResponse {
+	issuer, err := n.UserRepo.FindBySub(issuerId)
+	if err != nil {
+		log.Errorf("failed to check if user %s is admin: %v", issuerId, err)
+		return apierror.InternalServerError
+	}
+
+	if issuer == nil || !issuer.IsAdmin {
+		return apierror.UserNotAdmin
+	}
+
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
@@ -110,47 +148,60 @@ func (n *DefaultNoteService) DeleteNote(noteId int) apierror.ErrorResponse {
 	return nil
 }
 
-func validateAliases(vals []string) apierror.ErrorResponse {
-	for _, val := range vals {
-		if err := validateAlias(val); err != nil {
-			return err
-		}
+func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (string, apierror.ErrorResponse) {
+	ext := filepath.Ext(fileheader.Filename)
+	bytes, apierr := readNoteFile(fileheader)
+	if apierr != nil {
+		return "", apierror.InternalServerError
 	}
 
-	if hasDuplicates(vals) {
-		return apierror.DuplicateAliasError
+	if ext == ".txt" {
+		return string(bytes), nil
+	}
+
+	filename := uuid.NewString() + ext
+	key, err := s3.UploadFile(bytes, filename)
+	if err != nil {
+		log.Errorf("failed to upload file: %v", err)
+		return "", apierror.InternalServerError
+	}
+	return key, nil
+}
+
+func resolveNoteType(filename string) string {
+	if filepath.Ext(filename) == ".txt" {
+		return "CONTENT"
+	} else {
+		return "REFERENCE"
+	}
+}
+
+func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
+	if fileHeader.Size > MaxNoteFileSizeBytes {
+		return apierror.NewNoteContentTooLargeError(MaxNoteFileSizeBytes)
+	}
+
+	fmt.Println(fileHeader.Filename)
+	if ext, ok := utils.CheckFileExt(fileHeader.Filename, ValidNoteFileTypes); !ok {
+		return apierror.NewInvalidFileExtError(ext)
 	}
 	return nil
 }
 
-func validateAlias(val string) apierror.ErrorResponse {
-	size := len(val)
-
-	if size < MinAliasLength || size > MaxAliasLength {
-		return apierror.NewAliasLengthError(val, MinAliasLength, MaxAliasLength)
+func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorResponse) {
+	file, err := fileHeader.Open()
+	if err != nil {
+		log.Errorf("failed to open file: %v", err)
+		return nil, apierror.InternalServerError
 	}
-	return nil
-}
+	defer file.Close()
 
-func hasDuplicates(vals []string) bool {
-	seen := make(map[string]bool)
-
-	for _, val := range vals {
-		if seen[val] {
-			return true
-		}
-		seen[val] = true
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		log.Errorf("failed to read file: %v", err)
+		return nil, apierror.InternalServerError
 	}
-	return false
-}
-
-func sanitizeAliases(vals []string) []string {
-	out := make([]string, len(vals))
-	for i, val := range vals {
-		noSpaces := whitespaceRegex.ReplaceAllString(val, "")
-		out[i] = strings.ToLower(noSpaces)
-	}
-	return out
+	return bytes, nil
 }
 
 func toNoteResponse(note *entity.Note) *NoteResponse {
@@ -159,6 +210,8 @@ func toNoteResponse(note *entity.Note) *NoteResponse {
 		Name:        note.Name,
 		Content:     note.Content,
 		Tags:        strings.Split(note.Tags, " "),
+		Visibility:  note.Visibility,
+		NoteType:    note.NoteType,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),

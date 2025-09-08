@@ -14,6 +14,7 @@ import (
 type UserRepository interface {
 	FindAllInIDs(ids []int) ([]*entity.User, error)
 	FindByID(id int) (*entity.User, error)
+	FindBySub(sub string) (*entity.User, error)
 	FindByEmail(email string) (*entity.User, error)
 	ExistsByEmail(email string) (bool, error)
 	Save(user *entity.User) error

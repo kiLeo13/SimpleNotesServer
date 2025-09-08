@@ -28,7 +28,7 @@ func NewUserDefault(userService UserService) *DefaultUserRoute {
 func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
 	var req service.QueryUsersRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	users, err := u.UserService.QueryUsers(&req)
@@ -58,7 +58,7 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 	var req service.CreateUserRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	err := u.UserService.CreateUser(&req)
@@ -71,7 +71,7 @@ func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 	var req service.UserLoginRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	resp, apierr := u.UserService.Login(&req)
@@ -84,7 +84,7 @@ func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 	var req service.ConfirmSignupRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	apierr := u.UserService.ConfirmSignup(&req)
@@ -97,7 +97,7 @@ func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 func (u *DefaultUserRoute) ResendConfirmation(c echo.Context) error {
 	var req service.ResendConfirmRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedJSONError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	apierr := u.UserService.ResendConfirmation(&req)

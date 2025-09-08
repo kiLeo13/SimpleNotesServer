@@ -42,17 +42,18 @@ func (s *StructuredError) Add(field, problem string) {
 }
 
 var (
-	MalformedJSONError  = NewSimple(400, "Malformed JSON body")
+	MalformedBodyError  = NewSimple(400, "Malformed form body")
 	InternalServerError = NewSimple(500, "Internal server error")
 
 	NotFoundError        = NewSimple(404, "Resource not found")
-	DuplicateAliasError  = NewSimple(400, "Cannot have duplicate aliases")
 	InvalidIDError       = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
 	MissingNoteFileError = NewSimple(400, "Content file is required")
+	UserNotAdmin         = NewSimple(403, "Admin privileges are required for this operation")
 
 	/*
 	 * Used for authentications
 	 */
+	InvalidAuthTokenError       = NewSimple(401, "Invalid token")
 	UserAlreadyExistsError      = NewSimple(400, "User already exists")
 	UserAlreadyConfirmedError   = NewSimple(400, "User is already confirmed")
 	IDPInvalidPasswordError     = NewSimple(400, "Provided password does not meet requirements")

@@ -14,6 +14,7 @@ import (
 	"simplenotes/cmd/internal/domain/sqlite"
 	"simplenotes/cmd/internal/domain/sqlite/repository"
 	"simplenotes/cmd/internal/infrastructure/aws/cognito"
+	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/routes"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils/validators"
@@ -43,8 +44,13 @@ func main() {
 	}
 
 	// Init cognito client
-	cognitoClientId := os.Getenv("AWS_COGNITO_CLIENT_ID")
-	cogClient, err := cognitoclient.InitCognitoClient(cognitoClientId)
+	cogClient, err := cognitoclient.InitCognitoClient()
+	if err != nil {
+		panic(err)
+	}
+
+	// Init S3 client
+	s3Client, err := storage.NewStorageClient()
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +61,7 @@ func main() {
 
 	// Getting services
 	userService := service.NewUserService(userRepo, validate, cogClient)
-	noteService := service.NewNoteService(noteRepo, validate)
+	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
 
 	// Gettings routes
 	noteRoutes := routes.NewNoteDefault(noteService)
@@ -63,6 +69,7 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.CORS())
+	e.Use(middleware.BodyLimit("30M"))
 
 	// Notes
 	e.GET("/api/notes", noteRoutes.GetNotes)
