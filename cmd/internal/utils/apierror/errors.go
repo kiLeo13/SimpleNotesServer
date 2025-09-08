@@ -98,6 +98,8 @@ func FromValidationError(err error) *StructuredError {
 			problems[field] = append(problems[field], "Value cannot contain duplicate entries")
 		case "email":
 			problems[field] = append(problems[field], "Value must be a valid email address")
+		case "oneof":
+			problems[field] = append(problems[field], "Value must be one of the following: "+fe.Param())
 
 		default:
 			problems[field] = append(problems[field], "Invalid value provided")
