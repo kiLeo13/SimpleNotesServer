@@ -73,7 +73,8 @@ type cognitoClient struct {
 	appClientId   string
 }
 
-func InitCognitoClient(appClientId string) (CognitoInterface, error) {
+func InitCognitoClient() (CognitoInterface, error) {
+	appClientId := os.Getenv("AWS_COGNITO_CLIENT_ID")
 	region := os.Getenv("AWS_COGNITO_REGION")
 	poolId := os.Getenv("AWS_COGNITO_USER_POOL_ID")
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
