@@ -21,8 +21,11 @@ func NowUTC() int64 {
 }
 
 func CheckFileExt(fileName string, valid []string) (string, bool) {
-	ext := strings.ToLower(filepath.Ext(fileName))
-	return ext, slices.Contains(valid, ext)
+	ext := filepath.Ext(fileName)
+	if ext == "" {
+		return "", false
+	}
+	return ext, slices.Contains(valid, ext[1:])
 }
 
 func Sanitize(o any) {
