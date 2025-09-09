@@ -16,6 +16,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    volumes:
+      - simplenotes_data:/data
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -24,3 +26,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: --label-enable --interval 300
+
+volumes:
+  simplenotes_data: {}

@@ -10,7 +10,9 @@ import (
 )
 
 func Init() (*gorm.DB, error) {
-	dbPath := filepath.Join(".", "database.db")
+	// "/data" is a Docker volume mount defined in docker-compose.yml,
+	// so the DB file persists across container restarts and redeploys.
+	dbPath := filepath.Join("/data", "database.db")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
