@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"os"
 	"path/filepath"
 	"simplenotes/cmd/internal/domain/entity"
 	"time"
@@ -10,9 +11,11 @@ import (
 )
 
 func Init() (*gorm.DB, error) {
-	// "/data" is a Docker volume mount defined in docker-compose.yml,
-	// so the DB file persists across container restarts and redeploys.
-	dbPath := filepath.Join("/data", "database.db")
+	dataDir := os.Getenv("SQLITE_PATH")
+	if dataDir == "" {
+		dataDir = "/data"
+	}
+	dbPath := filepath.Join(dataDir, "database.db")
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err

@@ -9,6 +9,7 @@ services:
       - "7070:7070"
     environment:
       - GO_ENV=production
+      - SQLITE_PATH=/data
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     healthcheck:
@@ -17,7 +18,7 @@ services:
       timeout: 5s
       retries: 3
     volumes:
-      - simplenotes_data:/data
+      - /home/admin/SimpleNotesServer:/data
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -26,6 +27,3 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: --label-enable --interval 300
-
-volumes:
-  simplenotes_data: {}
