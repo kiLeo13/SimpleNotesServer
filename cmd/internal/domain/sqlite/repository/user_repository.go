@@ -67,14 +67,14 @@ func (u *DefaultUserRepository) FindBySub(sub string) (*entity.User, error) {
 }
 
 func (u *DefaultUserRepository) ExistsByEmail(email string) (bool, error) {
-	var exists bool
+	var exists int
 	err := u.db.
 		Raw("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email).
 		Scan(&exists).Error
 	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return exists == 1, nil
 }
 
 func (u *DefaultUserRepository) Save(user *entity.User) error {
