@@ -16,7 +16,7 @@ func NewNoteRepository(db *gorm.DB) *DefaultNoteRepository {
 
 func (d *DefaultNoteRepository) FindAll() ([]*entity.Note, error) {
 	var notes []*entity.Note
-	err := d.db.Find(notes).Error
+	err := d.db.Find(&notes).Error
 	if err != nil {
 		return nil, err
 	}
