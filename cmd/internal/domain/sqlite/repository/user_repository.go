@@ -29,7 +29,7 @@ func (u *DefaultUserRepository) FindAllInIDs(ids []int) ([]*entity.User, error) 
 
 func (u *DefaultUserRepository) FindByID(id int) (*entity.User, error) {
 	var user entity.User
-	err := u.db.First(user, id).Error
+	err := u.db.First(&user, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
