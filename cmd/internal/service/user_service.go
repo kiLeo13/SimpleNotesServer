@@ -193,14 +193,32 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.Err
 		return apierror.FromValidationError(err)
 	}
 
-	apierr := isUserConfirmed(u.UserRepo, req.Email)
+	user, err := u.UserRepo.FindByEmail(req.Email)
+	if err != nil {
+		log.Errorf("failed to find user (%s) by email: %v", req.Email, err)
+		return apierror.InternalServerError
+	}
+
+	if user == nil {
+		return apierror.IDPUserNotFoundError
+	}
+
+	if user.EmailVerified {
+		return apierror.UserAlreadyConfirmedError
+	}
+
+	apierr := handleConfirmResend(u.Cognito, req.Email)
 	if apierr != nil {
 		return apierr
 	}
 
-	apierr = handleConfirmResend(u.Cognito, req.Email)
-	if apierr != nil {
-		return apierr
+	// success
+	user.EmailVerified = true
+	user.UpdatedAt = utils.NowUTC()
+	err = u.UserRepo.Save(user)
+	if err != nil {
+		log.Errorf("failed to set user (%s) as verified. INCONSISTENCY RISK: %v", req.Email, err)
+		// No need to return an internal server error
 	}
 	return nil
 }
