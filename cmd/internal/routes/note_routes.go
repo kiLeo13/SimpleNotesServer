@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"github.com/labstack/echo/v4"
 	"mime/multipart"
 	"net/http"
@@ -37,8 +38,13 @@ func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
+	jsonPayload := c.FormValue("json_payload")
+	if jsonPayload == "" {
+		return c.JSON(400, apierror.FormJSONRequiredError)
+	}
+
 	var req service.NoteRequest
-	if err := c.Bind(&req); err != nil {
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return c.JSON(400, apierror.MalformedBodyError)
 	}
 

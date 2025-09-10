@@ -45,10 +45,11 @@ var (
 	MalformedBodyError  = NewSimple(400, "Malformed form body")
 	InternalServerError = NewSimple(500, "Internal server error")
 
-	NotFoundError        = NewSimple(404, "Resource not found")
-	InvalidIDError       = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
-	MissingNoteFileError = NewSimple(400, "Content file is required")
-	UserNotAdmin         = NewSimple(403, "Admin privileges are required for this operation")
+	NotFoundError         = NewSimple(404, "Resource not found")
+	FormJSONRequiredError = NewSimple(400, "Form field `json_payload` is required")
+	InvalidIDError        = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
+	MissingNoteFileError  = NewSimple(400, "Content file is required")
+	UserNotAdmin          = NewSimple(403, "Admin privileges are required for this operation")
 
 	/*
 	 * Used for authentications
