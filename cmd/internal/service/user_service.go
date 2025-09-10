@@ -48,8 +48,8 @@ type UserResponse struct {
 	ID        int    `json:"id"`
 	Username  string `json:"username"`
 	IsAdmin   bool   `json:"is_admin"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type UserLoginResponse struct {
@@ -326,7 +326,7 @@ func toUserResponse(user *entity.User) *UserResponse {
 		ID:        user.ID,
 		Username:  user.Username,
 		IsAdmin:   user.IsAdmin,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+		CreatedAt: utils.FormatEpoch(user.CreatedAt),
+		UpdatedAt: utils.FormatEpoch(user.UpdatedAt),
 	}
 }
