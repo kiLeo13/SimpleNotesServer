@@ -41,7 +41,7 @@ func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) GetUser(c echo.Context) error {
-	rawId := c.Request().PathValue("id")
+	rawId := c.Param("id")
 	id, err := strconv.Atoi(rawId)
 	if err != nil {
 		apierr := apierror.NewInvalidParamTypeError("id", "int32")
