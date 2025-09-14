@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -50,6 +51,7 @@ func (s *storageClient) UploadFile(data []byte, filename string) (string, error)
 		mimeType = http.DetectContentType(data)
 	}
 
+	fmt.Printf("Key is %s and mimetype is %s\n", key, mimeType)
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),

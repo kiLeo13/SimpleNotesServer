@@ -50,6 +50,7 @@ var (
 	InvalidIDError        = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
 	MissingNoteFileError  = NewSimple(400, "Content file is required")
 	UserNotAdmin          = NewSimple(403, "Admin privileges are required for this operation")
+	MissingFileNameError  = NewSimple(400, "File name is required")
 
 	/*
 	 * Used for authentications
