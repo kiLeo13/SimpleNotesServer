@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/gommon/log"
@@ -160,7 +159,6 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 	}
 
 	filename := uuid.NewString() + ext
-	fmt.Printf("File extension is %s and file to be uploaded to S3 will be: %s\n", ext, filename)
 	key, err := s3.UploadFile(bytes, filename)
 	if err != nil {
 		log.Errorf("failed to upload file: %v", err)
@@ -182,7 +180,6 @@ func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
 		return apierror.NewNoteContentTooLargeError(MaxNoteFileSizeBytes)
 	}
 
-	fmt.Printf("Filename is %s and size is %d bytes\n", fileHeader.Filename, fileHeader.Size)
 	if strings.TrimSpace(fileHeader.Filename) == "" {
 		return apierror.MissingFileNameError
 	}
