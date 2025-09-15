@@ -44,6 +44,10 @@ type ResendConfirmRequest struct {
 	Email string `json:"email" validate:"required,email"`
 }
 
+type UserExistsRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
 type UserResponse struct {
 	ID        int    `json:"id"`
 	Username  string `json:"username"`
@@ -104,9 +108,24 @@ func (u *UserService) GetUser(id int) (*UserResponse, apierror.ErrorResponse) {
 	return resp, nil
 }
 
+func (u *UserService) ExistsEmail(req *UserExistsRequest) (bool, apierror.ErrorResponse) {
+	utils.Sanitize(req)
+	if err := u.Validate.Struct(req); err != nil {
+		return false, apierror.FromValidationError(err)
+	}
+
+	exists, err := u.UserRepo.ExistsByEmail(req.Email)
+	if err != nil {
+		log.Errorf("failed to check if user (%s) exists: %v", req.Email, err)
+		return false, apierror.InternalServerError
+	}
+	return exists, nil
+}
+
 // CreateUser creates a new user on Cognito (as well as in our database),
 // and sends a verification code to the user's email address.
 func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse {
+	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return apierror.FromValidationError(err)
 	}
