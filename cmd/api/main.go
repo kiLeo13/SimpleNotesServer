@@ -77,6 +77,7 @@ func main() {
 	e.DELETE("/api/notes/:id", noteRoutes.DeleteNote)
 
 	// Users
+	e.POST("/api/users/check-email", userRoutes.EmailExists)
 	e.GET("/api/users/:id", userRoutes.GetUser)
 	e.POST("/api/users/query", userRoutes.QueryUsers)
 	e.POST("/api/users", userRoutes.CreateUser)
