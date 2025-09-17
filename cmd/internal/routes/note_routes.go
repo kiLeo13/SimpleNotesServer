@@ -48,7 +48,7 @@ func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
 		return c.JSON(400, apierror.MalformedBodyError)
 	}
 
-	data, err := utils.ParseTokenData(c)
+	data, err := utils.ParseTokenDataCtx(c)
 	if err != nil {
 		return c.JSON(401, apierror.InvalidAuthTokenError)
 	}
@@ -73,7 +73,7 @@ func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
 		return c.JSON(errResp.Status, errResp)
 	}
 
-	data, err := utils.ParseTokenData(c)
+	data, err := utils.ParseTokenDataCtx(c)
 	if err != nil {
 		return c.JSON(401, apierror.InvalidAuthTokenError)
 	}

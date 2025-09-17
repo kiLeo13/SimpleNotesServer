@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils/apierror"
-	"strconv"
+	"strings"
 )
 
 type UserService interface {
 	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, apierror.ErrorResponse)
-	GetUser(id int) (*service.UserResponse, apierror.ErrorResponse)
+	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
 	ExistsEmail(req *service.UserExistsRequest) (bool, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
@@ -42,14 +42,13 @@ func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) GetUser(c echo.Context) error {
-	rawId := c.Param("id")
-	id, err := strconv.Atoi(rawId)
-	if err != nil {
-		apierr := apierror.NewInvalidParamTypeError("id", "int32")
-		return c.JSON(apierr.Status, apierr)
+	rawId := strings.TrimSpace(c.Param("id"))
+	token := c.Request().Header.Get("Authorization")
+	if rawId == "" {
+		return c.JSON(http.StatusBadRequest, apierror.NewMissingParamError("id"))
 	}
 
-	user, apierr := u.UserService.GetUser(id)
+	user, apierr := u.UserService.GetUser(token, rawId)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}

@@ -20,8 +20,7 @@ type TokenData struct {
 	Email string
 }
 
-func ParseTokenData(ctx echo.Context) (*TokenData, error) {
-	token := getHeaderToken(ctx)
+func ParseTokenData(token string) (*TokenData, error) {
 	if token == "" {
 		return nil, errors.New("token is empty")
 	}
@@ -35,6 +34,11 @@ func ParseTokenData(ctx echo.Context) (*TokenData, error) {
 		Sub:   getValue(claims, "sub"),
 		Email: getValue(claims, "email"),
 	}, nil
+}
+
+func ParseTokenDataCtx(ctx echo.Context) (*TokenData, error) {
+	token := getHeaderToken(ctx)
+	return ParseTokenData(token)
 }
 
 // GetUnsafeClaims DOES NOT check if the claims are valid.

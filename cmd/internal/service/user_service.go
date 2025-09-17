@@ -9,6 +9,7 @@ import (
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
+	"strconv"
 )
 
 type UserRepository interface {
@@ -89,15 +90,15 @@ func (u *UserService) QueryUsers(req *QueryUsersRequest) ([]*UserResponse, apier
 	return resp, nil
 }
 
-func (u *UserService) GetUser(id int) (*UserResponse, apierror.ErrorResponse) {
-	if id < 1 {
-		return nil, apierror.InvalidIDError
+func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.ErrorResponse) {
+	tokenData, err := utils.ParseTokenData(token)
+	if err != nil {
+		return nil, apierror.InvalidAuthTokenError
 	}
 
-	user, err := u.UserRepo.FindByID(id)
-	if err != nil {
-		log.Errorf("failed to fetch user for ID %d: %v", id, err)
-		return nil, apierror.InternalServerError
+	user, apierr := u.fetchUser(rawId, tokenData.Sub)
+	if apierr != nil {
+		return nil, apierr
 	}
 
 	if user == nil {
@@ -240,6 +241,35 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.Err
 		// No need to return an internal server error
 	}
 	return nil
+}
+
+func (u *UserService) fetchUser(rawId, sub string) (*entity.User, apierror.ErrorResponse) {
+	if rawId == "@me" {
+		return u.fetchBySub(sub)
+	}
+	return u.fetchByID(rawId)
+}
+
+func (u *UserService) fetchBySub(sub string) (*entity.User, apierror.ErrorResponse) {
+	user, err := u.UserRepo.FindBySub(sub)
+	if err != nil {
+		log.Errorf("failed to find user (%s) by sub: %v", sub, err)
+		return nil, apierror.InternalServerError
+	}
+	return user, nil
+}
+
+func (u *UserService) fetchByID(rawId string) (*entity.User, apierror.ErrorResponse) {
+	userId, err := strconv.Atoi(rawId)
+	if err != nil {
+		return nil, apierror.NewInvalidParamTypeError("id", "int32")
+	}
+	user, err := u.UserRepo.FindByID(userId)
+	if err != nil {
+		log.Errorf("failed to find user (%s) by id: %v", rawId, err)
+		return nil, apierror.InternalServerError
+	}
+	return user, nil
 }
 
 func isUserConfirmed(repo UserRepository, email string) apierror.ErrorResponse {
