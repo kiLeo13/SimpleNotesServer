@@ -25,7 +25,8 @@ func ParseTokenData(token string) (*TokenData, error) {
 		return nil, errors.New("token is empty")
 	}
 
-	claims, err := GetUnsafeClaims(token)
+	clean := sanitizeToken(token)
+	claims, err := GetUnsafeClaims(clean)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +38,9 @@ func ParseTokenData(token string) (*TokenData, error) {
 }
 
 func ParseTokenDataCtx(ctx echo.Context) (*TokenData, error) {
-	token := getHeaderToken(ctx)
-	return ParseTokenData(token)
+	token := ctx.Request().Header.Get("Authorization")
+	clean := sanitizeToken(token)
+	return ParseTokenData(clean)
 }
 
 // GetUnsafeClaims DOES NOT check if the claims are valid.
@@ -55,15 +57,14 @@ func GetUnsafeClaims(tokenString string) (jwt.MapClaims, error) {
 	return nil, fmt.Errorf("invalid claims format")
 }
 
-func getHeaderToken(ctx echo.Context) string {
-	auth := ctx.Request().Header.Get("Authorization")
-	var token string
-	if strings.HasPrefix(auth, "Bearer") {
-		token = strings.TrimPrefix(auth, "Bearer")
+func sanitizeToken(token string) string {
+	var clean string
+	if strings.HasPrefix(token, "Bearer") {
+		clean = strings.TrimPrefix(token, "Bearer")
 	} else {
-		token = auth
+		clean = token
 	}
-	return strings.TrimSpace(token)
+	return strings.TrimSpace(clean)
 }
 
 func getValue(claims jwt.MapClaims, key string) string {
