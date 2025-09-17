@@ -128,6 +128,10 @@ func NewStructured(code int) *StructuredError {
 	}
 }
 
+func NewMissingParamError(name string) *APIError {
+	return NewSimple(http.StatusBadRequest, "Missing required parameter: %s", name)
+}
+
 func NewInvalidParamTypeError(name, dataType string) *APIError {
 	return NewSimple(http.StatusBadRequest, "Parameter '%s' has invalid type, expected: %s", name, dataType)
 }
