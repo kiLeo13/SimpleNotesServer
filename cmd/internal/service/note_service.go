@@ -24,7 +24,6 @@ type NoteResponse struct {
 	Content     string   `json:"content"`
 	Tags        []string `json:"tags"`
 	Visibility  string   `json:"visibility"`
-	NoteType    string   `json:"note_type"`
 	CreatedByID int      `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
@@ -97,7 +96,6 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		return nil, apierr
 	}
 
-	noteType := resolveNoteType(fileHeader.Filename)
 	now := utils.NowUTC()
 	note := &entity.Note{
 		Name:        req.Name,
@@ -105,7 +103,6 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		CreatedByID: issuer.ID,
 		Tags:        strings.Join(req.Tags, " "),
 		Visibility:  req.Visibility,
-		NoteType:    noteType,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -154,10 +151,6 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 		return "", apierr
 	}
 
-	if ext == ".txt" {
-		return string(bytes), nil
-	}
-
 	filename := uuid.NewString() + ext
 	key, err := s3.UploadFile(bytes, filename)
 	if err != nil {
@@ -165,14 +158,6 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 		return "", apierror.InternalServerError
 	}
 	return key, nil
-}
-
-func resolveNoteType(filename string) string {
-	if filepath.Ext(filename) == ".txt" {
-		return "CONTENT"
-	} else {
-		return "REFERENCE"
-	}
 }
 
 func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
@@ -213,7 +198,6 @@ func toNoteResponse(note *entity.Note) *NoteResponse {
 		Content:     note.Content,
 		Tags:        strings.Split(note.Tags, " "),
 		Visibility:  note.Visibility,
-		NoteType:    note.NoteType,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
