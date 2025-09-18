@@ -16,7 +16,7 @@ import (
 
 const MaxNoteFileSizeBytes = 30 * 1024 * 1024
 
-var ValidNoteFileTypes = []string{"txt", "pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
+var ValidNoteFileTypes = []string{"txt", "md", "pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
 
 type NoteResponse struct {
 	ID          int      `json:"id"`
