@@ -24,6 +24,7 @@ type NoteResponse struct {
 	Content     string   `json:"content,omitempty"`
 	Tags        []string `json:"tags"`
 	Visibility  string   `json:"visibility"`
+	NoteType    string   `json:"note_type"`
 	CreatedByID int      `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
@@ -224,6 +225,7 @@ func toNoteResponse(note *entity.Note) *NoteResponse {
 		Content:     content,
 		Tags:        toTagsArray(note.Tags),
 		Visibility:  note.Visibility,
+		NoteType:    note.NoteType,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
