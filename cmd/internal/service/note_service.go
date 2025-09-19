@@ -74,8 +74,10 @@ func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorR
 		return nil, apierror.InternalServerError
 	}
 
-	resp := toNoteResponse(note)
-	return resp, nil
+	if note == nil {
+		return nil, apierror.NotFoundError
+	}
+	return toNoteResponse(note), nil
 }
 
 func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
