@@ -101,9 +101,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		return nil, apierr
 	}
 
-	// Here, if the extension represents a `.txt` file, then
-	// "filename" will be the raw text inside the file.
-	// Any other file extension will be uploaded to S3 and return the filename.
+	ext := filepath.Ext(fileHeader.Filename)
 	filename, apierr := handleNoteUpload(n.S3, fileHeader)
 	if apierr != nil {
 		return nil, apierr
@@ -115,6 +113,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		Content:     filename,
 		CreatedByID: issuer.ID,
 		Tags:        strings.Join(req.Tags, " "),
+		NoteType:    toNoteType(ext),
 		Visibility:  req.Visibility,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -214,9 +213,8 @@ func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorRespo
 }
 
 func toNoteResponse(note *entity.Note) *NoteResponse {
-	ext := filepath.Ext(note.Content)
 	content := ""
-	if !isText(ext) {
+	if note.NoteType == "REFERENCE" {
 		content = note.Content
 	}
 
@@ -224,12 +222,26 @@ func toNoteResponse(note *entity.Note) *NoteResponse {
 		ID:          note.ID,
 		Name:        note.Name,
 		Content:     content,
-		Tags:        strings.Split(note.Tags, " "),
+		Tags:        toTagsArray(note.Tags),
 		Visibility:  note.Visibility,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
 	}
+}
+
+func toTagsArray(tags string) []string {
+	if len(tags) == 0 {
+		return []string{}
+	}
+	return strings.Split(tags, " ")
+}
+
+func toNoteType(ext string) string {
+	if isText(ext) {
+		return "TEXT"
+	}
+	return "REFERENCE"
 }
 
 func isText(ext string) bool {

@@ -6,6 +6,7 @@ type Note struct {
 	Content     string `gorm:"not null"`
 	CreatedByID int    `gorm:"not null"` // References: users(id)
 	Tags        string `gorm:"not null"`
+	NoteType    string `gorm:"not null"`
 	Visibility  string `gorm:"not null"`
 	CreatedAt   int64  `gorm:"not null"`
 	UpdatedAt   int64  `gorm:"not null"`
