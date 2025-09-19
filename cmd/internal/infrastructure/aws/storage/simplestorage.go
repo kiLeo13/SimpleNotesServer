@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 )
 
-const basePath = "attachments/"
+const PathAttachments = "attachments/"
 
 type S3Client interface {
-	UploadFile(data []byte, filename string) (string, error)
+	UploadFile(data []byte, key string) error
 }
 
 type storageClient struct {
@@ -39,13 +39,12 @@ func NewStorageClient() (S3Client, error) {
 	}, nil
 }
 
-func (s *storageClient) UploadFile(data []byte, filename string) (string, error) {
-	if filename == "" {
-		return "", errors.New("filename is empty")
+func (s *storageClient) UploadFile(data []byte, key string) error {
+	if key == "" {
+		return errors.New("key is empty")
 	}
 
-	key := basePath + filename
-	mimeType := mime.TypeByExtension(filepath.Ext(filename))
+	mimeType := mime.TypeByExtension(filepath.Ext(key))
 	if mimeType == "" {
 		mimeType = http.DetectContentType(data)
 	}
@@ -59,7 +58,7 @@ func (s *storageClient) UploadFile(data []byte, filename string) (string, error)
 
 	_, err := s.client.PutObject(context.Background(), input)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return key, nil
+	return nil
 }

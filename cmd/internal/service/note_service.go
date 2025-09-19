@@ -89,9 +89,9 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 	}
 
 	// Here, if the extension represents a `.txt` file, then
-	// "key" will be the raw text inside the file.
-	// Any other file extension will be uploaded to S3 and return the key.
-	key, apierr := handleNoteUpload(n.S3, fileHeader)
+	// "filename" will be the raw text inside the file.
+	// Any other file extension will be uploaded to S3 and return the filename.
+	filename, apierr := handleNoteUpload(n.S3, fileHeader)
 	if apierr != nil {
 		return nil, apierr
 	}
@@ -99,7 +99,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 	now := utils.NowUTC()
 	note := &entity.Note{
 		Name:        req.Name,
-		Content:     key,
+		Content:     filename,
 		CreatedByID: issuer.ID,
 		Tags:        strings.Join(req.Tags, " "),
 		Visibility:  req.Visibility,
@@ -152,12 +152,12 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 	}
 
 	filename := uuid.NewString() + ext
-	key, err := s3.UploadFile(bytes, filename)
+	err := s3.UploadFile(bytes, storage.PathAttachments+filename)
 	if err != nil {
 		log.Errorf("failed to upload file: %v", err)
 		return "", apierror.InternalServerError
 	}
-	return key, nil
+	return filename, nil
 }
 
 func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
