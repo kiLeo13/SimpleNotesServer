@@ -63,7 +63,7 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorRespo
 
 	resp := make([]*NoteResponse, len(notes))
 	for i, note := range notes {
-		resp[i] = toNoteResponse(note)
+		resp[i] = toNoteResponse(note, false)
 	}
 	return resp, nil
 }
@@ -78,7 +78,7 @@ func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorR
 	if note == nil {
 		return nil, apierror.NotFoundError
 	}
-	return toNoteResponse(note), nil
+	return toNoteResponse(note, true), nil
 }
 
 func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
@@ -125,7 +125,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		log.Errorf("failed to create note: %v", err)
 		return nil, apierror.InternalServerError
 	}
-	return toNoteResponse(note), nil
+	return toNoteResponse(note, true), nil
 }
 
 func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.ErrorResponse {
@@ -213,9 +213,9 @@ func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorRespo
 	return bytes, nil
 }
 
-func toNoteResponse(note *entity.Note) *NoteResponse {
+func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 	content := ""
-	if note.NoteType == "REFERENCE" {
+	if note.NoteType == "REFERENCE" || forceContent {
 		content = note.Content
 	}
 
