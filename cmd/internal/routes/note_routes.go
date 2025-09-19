@@ -13,6 +13,7 @@ import (
 
 type NoteService interface {
 	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
+	GetNoteByID(id int) (*service.NoteResponse, apierror.ErrorResponse)
 	CreateNote(req *service.NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
 	DeleteNote(noteId int, issuerId string) apierror.ErrorResponse
 }
@@ -35,6 +36,21 @@ func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
 		"notes": notes,
 	}
 	return c.JSON(http.StatusOK, &resp)
+}
+
+func (n *DefaultNoteRoute) GetNote(c echo.Context) error {
+	rawId := c.Param("id")
+	id, err := strconv.Atoi(rawId)
+	if err != nil {
+		errResp := apierror.NewSimple(400, "ID is not a number")
+		return c.JSON(errResp.Status, errResp)
+	}
+
+	note, apierr := n.NoteService.GetNoteByID(id)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.JSON(http.StatusOK, note)
 }
 
 func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {

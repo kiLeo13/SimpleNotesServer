@@ -73,6 +73,7 @@ func main() {
 
 	// Notes
 	e.GET("/api/notes", noteRoutes.GetNotes)
+	e.GET("/api/notes/:id", noteRoutes.GetNote)
 	e.POST("/api/notes", noteRoutes.CreateNote)
 	e.DELETE("/api/notes/:id", noteRoutes.DeleteNote)
 

@@ -67,6 +67,17 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorRespo
 	return resp, nil
 }
 
+func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorResponse) {
+	note, err := n.NoteRepo.FindByID(id)
+	if err != nil {
+		log.Errorf("failed to fetch note: %v", err)
+		return nil, apierror.InternalServerError
+	}
+
+	resp := toNoteResponse(note)
+	return resp, nil
+}
+
 func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
 	issuer, err := n.UserRepo.FindBySub(issuerId)
 	if err != nil {
