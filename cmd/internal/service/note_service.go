@@ -155,11 +155,20 @@ func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.Er
 	return nil
 }
 
+// handleNoteUpload tries to upload the note to S3.
+// EXCEPT if the file is a text file, which in such cases this method
+// will return immediately with the content of the text file.
+//
+// If the file IS NOT a text file, it uploads to the S3 bucket and returns the filename.
 func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (string, apierror.ErrorResponse) {
 	ext := filepath.Ext(fileheader.Filename)
 	bytes, apierr := readNoteFile(fileheader)
 	if apierr != nil {
 		return "", apierr
+	}
+
+	if isText(ext) {
+		return string(bytes), nil
 	}
 
 	filename := uuid.NewString() + ext
