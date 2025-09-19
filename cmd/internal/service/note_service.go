@@ -21,7 +21,7 @@ var ValidNoteFileTypes = []string{"txt", "md", "pdf", "png", "jpg", "jpeg", "jfi
 type NoteResponse struct {
 	ID          int      `json:"id"`
 	Name        string   `json:"name"`
-	Content     string   `json:"content"`
+	Content     string   `json:"content,omitempty"`
 	Tags        []string `json:"tags"`
 	Visibility  string   `json:"visibility"`
 	CreatedByID int      `json:"created_by_id"`
@@ -192,14 +192,24 @@ func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorRespo
 }
 
 func toNoteResponse(note *entity.Note) *NoteResponse {
+	ext := filepath.Ext(note.Content)
+	content := ""
+	if !isText(ext) {
+		content = note.Content
+	}
+
 	return &NoteResponse{
 		ID:          note.ID,
 		Name:        note.Name,
-		Content:     note.Content,
+		Content:     content,
 		Tags:        strings.Split(note.Tags, " "),
 		Visibility:  note.Visibility,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
 	}
+}
+
+func isText(ext string) bool {
+	return ext == ".txt" || ext == ".md"
 }
