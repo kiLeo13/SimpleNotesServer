@@ -289,19 +289,6 @@ func isUserConfirmed(repo UserRepository, email string) apierror.ErrorResponse {
 	return nil
 }
 
-// handleUserSignup attempts to register a new user account in Amazon Cognito.
-//
-// On success, it returns the user's unique identifier (SUB) as a string, and a nil *StructuredError.
-//
-// On failure, it returns a non-nil *StructuredError that describes the reason for the failure—
-// such as invalid input or a Cognito-specific error. This error can be safely returned
-// to the client to provide feedback.
-//
-// In all cases, this method also returns a `revert()` function you can call to request
-// Cognito for the user deletion from the pool.
-//
-// Parameters:
-//   - req: a pointer to a cognitoclient.User struct containing the user's signup information.
 func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
 	revert := func() {
 		_ = cogClient.AdminDeleteUser(req.Email)
