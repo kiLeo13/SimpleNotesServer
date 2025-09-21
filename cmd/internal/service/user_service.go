@@ -191,9 +191,18 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) apierror.ErrorRes
 		return apierror.FromValidationError(err)
 	}
 
-	apierr := isUserConfirmed(u.UserRepo, req.Email)
-	if apierr != nil {
-		return apierr
+	user, err := u.UserRepo.FindByEmail(req.Email)
+	if err != nil {
+		log.Errorf("failed to fetch user from database: %v", err)
+		return apierror.InternalServerError
+	}
+
+	if user == nil {
+		return apierror.IDPUserNotFoundError
+	}
+
+	if user.EmailVerified {
+		return apierror.UserAlreadyConfirmedError
 	}
 
 	confirms := &cognitoclient.UserConfirmation{
@@ -201,9 +210,17 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) apierror.ErrorRes
 		Code:  req.Code,
 	}
 
-	apierr = handleSignupConfirmation(u.Cognito, confirms)
+	apierr := handleSignupConfirmation(u.Cognito, confirms)
 	if apierr != nil {
 		return apierr
+	}
+
+	now := utils.NowUTC()
+	user.EmailVerified = true
+	user.UpdatedAt = now
+	err = u.UserRepo.Save(user)
+	if err != nil {
+		log.Errorf("failed to update user (%d) verified status: %v", user.ID, err)
 	}
 	return nil
 }
@@ -270,23 +287,6 @@ func (u *UserService) fetchByID(rawId string) (*entity.User, apierror.ErrorRespo
 		return nil, apierror.InternalServerError
 	}
 	return user, nil
-}
-
-func isUserConfirmed(repo UserRepository, email string) apierror.ErrorResponse {
-	user, err := repo.FindByEmail(email)
-	if err != nil {
-		log.Errorf("failed to fetch user for email %s: %v", email, err)
-		return apierror.InternalServerError
-	}
-
-	if user == nil {
-		return apierror.IDPUserNotFoundError
-	}
-
-	if user.EmailVerified {
-		return apierror.UserAlreadyConfirmedError
-	}
-	return nil
 }
 
 func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
