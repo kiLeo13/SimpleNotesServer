@@ -174,6 +174,17 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
 	}
+
+    user, err := u.UserRepo.FindByEmail(req.Email)
+    if err != nil {
+        log.Errorf("failed to fetch user from database: %v", err)
+        return nil, apierror.InternalServerError
+    }
+
+    if user == nil {
+        return nil, apierror.IDPUserNotFoundError
+    }
+
 	credentials := &cognitoclient.UserLogin{
 		Email:    req.Email,
 		Password: req.Password,
