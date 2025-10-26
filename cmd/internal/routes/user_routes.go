@@ -1,11 +1,12 @@
 package routes
 
 import (
-	"github.com/labstack/echo/v4"
 	"net/http"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
+
+	"github.com/labstack/echo/v4"
 )
 
 type UserService interface {
@@ -55,7 +56,7 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-func (u *DefaultUserRoute) EmailExists(c echo.Context) error {
+func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 	var req service.UserExistsRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)

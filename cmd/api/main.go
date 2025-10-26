@@ -2,6 +2,15 @@ package main
 
 import (
 	"context"
+	"os"
+	"simplenotes/cmd/internal/domain/sqlite"
+	"simplenotes/cmd/internal/domain/sqlite/repository"
+	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
+	"simplenotes/cmd/internal/infrastructure/aws/storage"
+	"simplenotes/cmd/internal/routes"
+	"simplenotes/cmd/internal/service"
+	"simplenotes/cmd/internal/utils/validators"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -10,14 +19,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
-	"os"
-	"simplenotes/cmd/internal/domain/sqlite"
-	"simplenotes/cmd/internal/domain/sqlite/repository"
-	"simplenotes/cmd/internal/infrastructure/aws/cognito"
-	"simplenotes/cmd/internal/infrastructure/aws/storage"
-	"simplenotes/cmd/internal/routes"
-	"simplenotes/cmd/internal/service"
-	"simplenotes/cmd/internal/utils/validators"
 )
 
 const envVarsPrefix = "/simplenotes/prod/"
@@ -78,7 +79,7 @@ func main() {
 	e.DELETE("/api/notes/:id", noteRoutes.DeleteNote)
 
 	// Users
-	e.POST("/api/users/check-email", userRoutes.EmailExists)
+	e.POST("/api/users/check-email", userRoutes.CheckEmail)
 	e.GET("/api/users/:id", userRoutes.GetUser)
 	e.POST("/api/users/query", userRoutes.QueryUsers)
 	e.POST("/api/users", userRoutes.CreateUser)
