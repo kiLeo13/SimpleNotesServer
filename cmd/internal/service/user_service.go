@@ -2,14 +2,26 @@ package service
 
 import (
 	"errors"
-	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
-	"github.com/go-playground/validator/v10"
-	"github.com/labstack/gommon/log"
 	"simplenotes/cmd/internal/domain/entity"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
+
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/gommon/log"
+)
+
+type EmailStatus string
+
+const (
+	// EmailStatusAvailable indicates that the email is available for registration.
+	EmailStatusAvailable EmailStatus = "AVAILABLE"
+	// EmailStatusExists indicates that the email is already in use by some user.
+	EmailStatusExists EmailStatus = "TAKEN"
+	// EmailStatusVerifying indicates that the email is in the process of verification.
+	EmailStatusVerifying EmailStatus = "VERIFYING"
 )
 
 type UserRepository interface {
@@ -45,7 +57,7 @@ type ResendConfirmRequest struct {
 	Email string `json:"email" validate:"required,email"`
 }
 
-type UserExistsRequest struct {
+type UserStatusRequest struct {
 	Email string `json:"email" validate:"required,email"`
 }
 
@@ -109,18 +121,28 @@ func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.Erro
 	return resp, nil
 }
 
-func (u *UserService) CheckEmail(req *UserExistsRequest) (bool, apierror.ErrorResponse) {
+func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
-		return false, apierror.FromValidationError(err)
+		return nil, apierror.FromValidationError(err)
 	}
 
-	exists, err := u.UserRepo.ExistsByEmail(req.Email)
+	var status EmailStatus
+	user, err := u.UserRepo.FindByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to check if user (%s) exists: %v", req.Email, err)
-		return false, apierror.InternalServerError
+		return nil, apierror.InternalServerError
 	}
-	return exists, nil
+
+	switch {
+	case user == nil:
+		status = EmailStatusAvailable
+	case !user.EmailVerified:
+		status = EmailStatusVerifying
+	default:
+		status = EmailStatusExists
+	}
+	return &status, nil
 }
 
 // CreateUser creates a new user on Cognito (as well as in our database),
@@ -175,15 +197,15 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror
 		return nil, apierror.FromValidationError(err)
 	}
 
-    user, err := u.UserRepo.FindByEmail(req.Email)
-    if err != nil {
-        log.Errorf("failed to fetch user from database: %v", err)
-        return nil, apierror.InternalServerError
-    }
+	user, err := u.UserRepo.FindByEmail(req.Email)
+	if err != nil {
+		log.Errorf("failed to fetch user from database: %v", err)
+		return nil, apierror.InternalServerError
+	}
 
-    if user == nil {
-        return nil, apierror.IDPUserNotFoundError
-    }
+	if user == nil {
+		return nil, apierror.IDPUserNotFoundError
+	}
 
 	credentials := &cognitoclient.UserLogin{
 		Email:    req.Email,

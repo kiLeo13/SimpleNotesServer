@@ -12,7 +12,7 @@ import (
 type UserService interface {
 	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
-	CheckEmail(req *service.UserExistsRequest) (bool, apierror.ErrorResponse)
+	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
 	ConfirmSignup(req *service.ConfirmSignupRequest) apierror.ErrorResponse
@@ -57,17 +57,17 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
-	var req service.UserExistsRequest
+	var req service.UserStatusRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	exists, err := u.UserService.CheckEmail(&req)
+	status, err := u.UserService.CheckEmail(&req)
 	if err != nil {
 		return c.JSON(err.Code(), err)
 	}
 
-	resp := echo.Map{"exists": exists}
+	resp := echo.Map{"status": status}
 	return c.JSON(http.StatusOK, &resp)
 }
 
