@@ -67,7 +67,10 @@ func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 		return c.JSON(err.Code(), err)
 	}
 
-	resp := echo.Map{"status": status}
+	resp := echo.Map{
+        "status": status,
+        "exists": *status == "TAKEN", // Legacy compatibility
+    }
 	return c.JSON(http.StatusOK, &resp)
 }
 
