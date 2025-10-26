@@ -12,7 +12,7 @@ import (
 type UserService interface {
 	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
-	ExistsEmail(req *service.UserExistsRequest) (bool, apierror.ErrorResponse)
+	CheckEmail(req *service.UserExistsRequest) (bool, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
 	ConfirmSignup(req *service.ConfirmSignupRequest) apierror.ErrorResponse
@@ -62,7 +62,7 @@ func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	exists, err := u.UserService.ExistsEmail(&req)
+	exists, err := u.UserService.CheckEmail(&req)
 	if err != nil {
 		return c.JSON(err.Code(), err)
 	}

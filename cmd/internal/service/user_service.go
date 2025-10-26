@@ -109,7 +109,7 @@ func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.Erro
 	return resp, nil
 }
 
-func (u *UserService) ExistsEmail(req *UserExistsRequest) (bool, apierror.ErrorResponse) {
+func (u *UserService) CheckEmail(req *UserExistsRequest) (bool, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return false, apierror.FromValidationError(err)
