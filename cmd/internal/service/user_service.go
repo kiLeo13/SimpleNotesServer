@@ -1,14 +1,12 @@
 package service
 
 import (
-	"errors"
 	"simplenotes/cmd/internal/domain/entity"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
 
-	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
 )
@@ -328,45 +326,34 @@ func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 	}
 
 	uuid, err := cogClient.SignUp(req)
-	if err == nil {
-        return "", utils.MapCognitoError(err), revert
-    }
-    return uuid, nil, revert
+	if err != nil {
+		return "", utils.MapCognitoError(err), revert
+	}
+	return uuid, nil, revert
 }
 
 func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, apierror.ErrorResponse) {
 	auth, err := cogClient.SignIn(req)
-	if err == nil {
+	if err != nil {
 		return nil, utils.MapCognitoError(err)
 	}
-    return auth, nil
+	return auth, nil
 }
 
 func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserConfirmation) apierror.ErrorResponse {
 	err := cogClient.ConfirmAccount(req)
-	if err == nil {
+	if err != nil {
 		return utils.MapCognitoError(err)
 	}
-    return nil
+	return nil
 }
 
 func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string) apierror.ErrorResponse {
 	err := cogClient.ResendConfirmation(email)
-	if err == nil {
-		return nil
+	if err != nil {
+		return utils.MapCognitoError(err)
 	}
-
-	switch {
-	case errors.Is(err, &types.UserNotFoundException{}):
-		return apierror.IDPUserNotFoundError
-
-	case errors.Is(err, &types.InvalidParameterException{}):
-		return apierror.IDPInvalidParameterError
-
-	default:
-		log.Errorf("failed to resend confirmation code to email (%s): %v", email, err)
-		return apierror.InternalServerError
-	}
+	return nil
 }
 
 func toUserResponse(user *entity.User) *UserResponse {
