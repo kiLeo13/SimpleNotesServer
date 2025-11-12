@@ -1,11 +1,26 @@
 package utils
 
 import (
+	"errors"
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+	"github.com/labstack/gommon/log"
 	"path/filepath"
 	"reflect"
+	"simplenotes/cmd/internal/utils/apierror"
 	"slices"
 	"strings"
 	"time"
+)
+
+var (
+	invalidPwd    *types.InvalidPasswordException
+	userExists    *types.UsernameExistsException
+	userNotFound  *types.UserNotFoundException
+	notConfirmed  *types.UserNotConfirmedException
+	notAuthorized *types.NotAuthorizedException
+	codeMismatch  *types.CodeMismatchException
+	expiredCode   *types.ExpiredCodeException
+	invalidParam  *types.InvalidParameterException
 )
 
 func FormatEpoch(millis int64) string {
@@ -26,6 +41,31 @@ func CheckFileExt(fileName string, valid []string) (string, bool) {
 		return "", false
 	}
 	return ext, slices.Contains(valid, ext[1:])
+}
+
+func MapCognitoError(err error) apierror.ErrorResponse {
+	switch {
+	case errors.As(err, &invalidPwd):
+		return apierror.IDPInvalidPasswordError
+	case errors.As(err, &userExists):
+		return apierror.IDPExistingEmailError
+	case errors.As(err, &userNotFound):
+		return apierror.IDPUserNotFoundError
+	case errors.As(err, &notConfirmed):
+		return apierror.IDPUserNotConfirmedError
+	case errors.As(err, &notAuthorized):
+		return apierror.IDPCredentialsMismatchError
+	case errors.As(err, &codeMismatch):
+		return apierror.IDPConfirmCodeMismatchError
+	case errors.As(err, &expiredCode):
+		return apierror.IDPConfirmCodeExpiredError
+	case errors.As(err, &invalidParam):
+		return apierror.IDPInvalidParameterError
+	default:
+		// Log the original underlying error for debugging purposes
+		log.Errorf("unmapped cognito error: %v", err)
+		return apierror.InternalServerError
+	}
 }
 
 func Sanitize(o any) {
