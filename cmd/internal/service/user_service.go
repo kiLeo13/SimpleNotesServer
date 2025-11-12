@@ -329,64 +329,25 @@ func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 
 	uuid, err := cogClient.SignUp(req)
 	if err == nil {
-		return uuid, nil, revert
-	}
-
-	switch {
-	case errors.Is(err, &types.InvalidPasswordException{}):
-		return "", apierror.IDPInvalidPasswordError, revert
-
-	case errors.Is(err, &types.UsernameExistsException{}):
-		return "", apierror.IDPExistingEmailError, revert
-
-	default:
-		log.Errorf("failed to signup user: %v", err)
-		return "", apierror.InternalServerError, revert
-	}
+        return "", utils.MapCognitoError(err), revert
+    }
+    return uuid, nil, revert
 }
 
 func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, apierror.ErrorResponse) {
 	auth, err := cogClient.SignIn(req)
 	if err == nil {
-		return auth, nil
+		return nil, utils.MapCognitoError(err)
 	}
-
-	switch {
-	case errors.Is(err, &types.UserNotFoundException{}):
-		return nil, apierror.IDPUserNotFoundError
-
-	case errors.Is(err, &types.UserNotConfirmedException{}):
-		return nil, apierror.IDPUserNotConfirmedError
-
-	case errors.Is(err, &types.NotAuthorizedException{}):
-		return nil, apierror.IDPCredentialsMismatchError
-
-	default:
-		log.Errorf("failed to signin user (%s): %v", req.Email, err)
-		return nil, apierror.InternalServerError
-	}
+    return auth, nil
 }
 
 func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserConfirmation) apierror.ErrorResponse {
 	err := cogClient.ConfirmAccount(req)
 	if err == nil {
-		return nil
+		return utils.MapCognitoError(err)
 	}
-
-	switch {
-	case errors.Is(err, &types.CodeMismatchException{}):
-		return apierror.IDPConfirmCodeMismatchError
-
-	case errors.Is(err, &types.ExpiredCodeException{}):
-		return apierror.IDPConfirmCodeExpiredError
-
-	case errors.Is(err, &types.UserNotFoundException{}):
-		return apierror.IDPUserNotFoundError
-
-	default:
-		log.Errorf("failed to confirm user (%s): %v", req.Email, err)
-		return apierror.InternalServerError
-	}
+    return nil
 }
 
 func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string) apierror.ErrorResponse {
