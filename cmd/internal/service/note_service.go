@@ -25,6 +25,7 @@ type NoteResponse struct {
 	Tags        []string `json:"tags"`
 	Visibility  string   `json:"visibility"`
 	NoteType    string   `json:"note_type"`
+	ContentSize int      `json:"content_size"`
 	CreatedByID int      `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
@@ -115,6 +116,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		CreatedByID: issuer.ID,
 		Tags:        strings.Join(req.Tags, " "),
 		NoteType:    toNoteType(ext),
+		ContentSize: int(fileHeader.Size), // I really hope never exceed the 32-bits content length lol
 		Visibility:  req.Visibility,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -226,6 +228,7 @@ func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 		Tags:        toTagsArray(note.Tags),
 		Visibility:  note.Visibility,
 		NoteType:    note.NoteType,
+		ContentSize: note.ContentSize,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
