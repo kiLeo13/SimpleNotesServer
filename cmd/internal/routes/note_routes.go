@@ -15,6 +15,7 @@ type NoteService interface {
 	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
 	GetNoteByID(id int) (*service.NoteResponse, apierror.ErrorResponse)
 	CreateNote(req *service.NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
+	UpdateNote(id int, userSub string, req *service.UpdateNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
 	DeleteNote(noteId int, issuerId string) apierror.ErrorResponse
 }
 
@@ -79,6 +80,30 @@ func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
 		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.JSON(http.StatusCreated, &note)
+}
+
+func (n *DefaultNoteRoute) UpdateNote(c echo.Context) error {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		errResp := apierror.NewSimple(400, "ID is not a number")
+		return c.JSON(errResp.Status, errResp)
+	}
+	var req service.UpdateNoteRequest
+	if err = c.Bind(&req); err != nil {
+		return c.JSON(400, apierror.MalformedBodyError)
+	}
+
+	token, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(401, apierror.InvalidAuthTokenError)
+	}
+
+	newNote, apierr := n.NoteService.UpdateNote(id, token.Sub, &req)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.JSON(http.StatusOK, &newNote)
 }
 
 func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {

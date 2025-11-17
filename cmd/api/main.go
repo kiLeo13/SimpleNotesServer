@@ -76,6 +76,7 @@ func main() {
 	e.GET("/api/notes", noteRoutes.GetNotes)
 	e.GET("/api/notes/:id", noteRoutes.GetNote)
 	e.POST("/api/notes", noteRoutes.CreateNote)
+	e.PATCH("/api/notes/:id", noteRoutes.UpdateNote)
 	e.DELETE("/api/notes/:id", noteRoutes.DeleteNote)
 
 	// Users
