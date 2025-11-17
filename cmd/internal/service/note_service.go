@@ -37,6 +37,12 @@ type NoteRequest struct {
 	Tags       []string `form:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
 
+type UpdateNoteRequest struct {
+	Name       *string  `form:"name" validate:"omitempty,min=2,max=80"`
+	Visibility *string  `form:"visibility" validate:"omitempty,oneof=PUBLIC CONFIDENTIAL"`
+	Tags       []string `form:"tags" validate:"omitempty,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
+}
+
 type NoteRepository interface {
 	FindAll() ([]*entity.Note, error)
 	FindByID(id int) (*entity.Note, error)
@@ -128,6 +134,56 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		return nil, apierror.InternalServerError
 	}
 	return toNoteResponse(note, true), nil
+}
+
+func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
+	utils.Sanitize(req)
+	if valerr := n.Validate.Struct(req); valerr != nil {
+		return nil, apierror.FromValidationError(valerr)
+	}
+
+	user, err := n.UserRepo.FindBySub(userSub)
+	if err != nil {
+		log.Errorf("failed to fetch user: %v", err)
+		return nil, apierror.InternalServerError
+	}
+
+	if user == nil || !user.IsAdmin {
+		return nil, apierror.UserNotAdmin
+	}
+
+	note, err := n.NoteRepo.FindByID(id)
+	if err != nil {
+		log.Errorf("failed to fetch note: %v", err)
+		return nil, apierror.InternalServerError
+	}
+
+	if note == nil {
+		return nil, apierror.NotFoundError
+	}
+
+	if utils.IsEmpty(req) {
+		return nil, apierror.EmptyPatchCallError
+	}
+
+	// Now, we can finally PATCH our data :D
+	tags := strings.Join(req.Tags, " ")
+	if req.Name != nil {
+		note.Name = *req.Name
+	}
+	if req.Visibility != nil {
+		note.Visibility = *req.Visibility
+	}
+	if req.Tags != nil {
+		note.Tags = tags
+	}
+
+	err = n.NoteRepo.Save(note)
+	if err != nil {
+		log.Errorf("failed to update note: %v", err)
+		return nil, apierror.InternalServerError
+	}
+	return toNoteResponse(note, false), nil
 }
 
 func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.ErrorResponse {
