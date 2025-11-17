@@ -47,7 +47,7 @@ var (
 
 	NotFoundError         = NewSimple(404, "Resource not found")
 	FormJSONRequiredError = NewSimple(400, "Form field `json_payload` is required")
-	InvalidIDError        = NewSimple(400, "The provided ID is invalid, IDs are usually int32 > 0")
+	EmptyPatchCallError   = NewSimple(400, "Empty PATCH request")
 	MissingNoteFileError  = NewSimple(400, "Content file is required")
 	UserNotAdmin          = NewSimple(403, "Admin privileges are required for this operation")
 	MissingFileNameError  = NewSimple(400, "File name is required")
