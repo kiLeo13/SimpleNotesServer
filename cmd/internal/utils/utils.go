@@ -35,6 +35,37 @@ func NowUTC() int64 {
 		UnixMilli()
 }
 
+// IsEmpty reports whether all pointer fields in the given struct are nil.
+// This is useful for PATCH handlers that rely on pointer fields to
+// distinguish provided fields from omitted ones. If every pointer field
+// is nil after binding, the payload is effectively empty.
+//
+// v may be a struct or a pointer to a struct. Non-pointer fields
+// (e.g., slices or value types) are ignored.
+func IsEmpty(v any) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+
+	for i := 0; i < rv.NumField(); i++ {
+		f := rv.Field(i)
+
+		if f.Kind() == reflect.Ptr && !f.IsNil() {
+			return false
+		}
+	}
+	return true
+}
+
+// CheckFileExt reports whether the file's extension is included in the
+// provided list of valid extensions. Extensions in the valid slice must not
+// include a leading dot (e.g., ["txt", "pdf"]).
+//
+// It returns the extension (without the leading dot) and a boolean
+// indicating whether the extension is accepted. If the file has no
+// extension, the returned extension is an empty string and the validity
+// flag is false.
 func CheckFileExt(fileName string, valid []string) (string, bool) {
 	ext := filepath.Ext(fileName)
 	if ext == "" {
