@@ -115,12 +115,13 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		return nil, apierr
 	}
 
+	tags := strings.Join(req.Tags, " ")
 	now := utils.NowUTC()
 	note := &entity.Note{
 		Name:        req.Name,
 		Content:     filename,
 		CreatedByID: issuer.ID,
-		Tags:        strings.Join(req.Tags, " "),
+		Tags:        strings.ToLower(tags),
 		NoteType:    toNoteType(ext),
 		ContentSize: int(fileHeader.Size), // I really hope never exceed the 32-bits content length lol
 		Visibility:  req.Visibility,
@@ -175,7 +176,7 @@ func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteR
 		note.Visibility = *req.Visibility
 	}
 	if req.Tags != nil {
-		note.Tags = tags
+		note.Tags = strings.ToLower(tags)
 	}
 
 	err = n.NoteRepo.Save(note)
