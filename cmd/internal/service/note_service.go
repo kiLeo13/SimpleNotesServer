@@ -179,6 +179,7 @@ func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteR
 		note.Tags = strings.ToLower(tags)
 	}
 
+	note.UpdatedAt = utils.NowUTC()
 	err = n.NoteRepo.Save(note)
 	if err != nil {
 		log.Errorf("failed to update note: %v", err)
