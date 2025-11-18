@@ -23,12 +23,16 @@ var (
 	invalidParam  *types.InvalidParameterException
 )
 
+// FormatEpoch formats the provided UTC millis and returns the
+// formatted datetime in the ISO8601 Date/Time format.
 func FormatEpoch(millis int64) string {
 	return time.UnixMilli(millis).
 		UTC().
 		Format(time.RFC3339)
 }
 
+// NowUTC returns the current UTC time in millis.
+// This value should be used for almost all timestamps or time-tracking fields.
 func NowUTC() int64 {
 	return time.Now().
 		UTC().
@@ -99,6 +103,8 @@ func MapCognitoError(err error) apierror.ErrorResponse {
 	}
 }
 
+// Sanitize sanitizes the given struct and returns all strings
+// with no leading/trailing white spaces, including items in slices.
 func Sanitize(o any) {
 	v := reflect.ValueOf(o)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
