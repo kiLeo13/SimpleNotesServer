@@ -10,7 +10,7 @@ type Note struct {
 	ContentSize int    `gorm:"not null"`
 	Visibility  string `gorm:"not null"`
 	CreatedAt   int64  `gorm:"not null"`
-	UpdatedAt   int64  `gorm:"not null"`
+	UpdatedAt   int64  `gorm:"not null;autoUpdateTime:false"`
 
 	// Relations
 	CreatedBy User `gorm:"foreignKey:CreatedByID;references:ID"`
