@@ -163,10 +163,6 @@ func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteR
 		return nil, apierror.NotFoundError
 	}
 
-	if utils.IsEmpty(req) {
-		return nil, apierror.EmptyPatchCallError
-	}
-
 	// Now, we can finally PATCH our data :D
 	tags := strings.Join(req.Tags, " ")
 	if req.Name != nil {
