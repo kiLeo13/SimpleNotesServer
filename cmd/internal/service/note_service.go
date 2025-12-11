@@ -1,6 +1,9 @@
 package service
 
 import (
+	"errors"
+	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/gommon/log"
@@ -205,6 +208,12 @@ func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.Er
 		return apierror.NotFoundError
 	}
 
+	err = deleteBucketObject(n.S3, note.Content)
+	if err != nil {
+		log.Errorf("failed to delete note: %v", err)
+		return apierror.InternalServerError
+	}
+
 	err = n.NoteRepo.Delete(note)
 	if err != nil {
 		log.Errorf("failed to delete note: %v", err)
@@ -287,6 +296,29 @@ func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
 		UpdatedAt:   utils.FormatEpoch(note.UpdatedAt),
 	}
+}
+
+// deleteBucketObject deletes the file with the given name from the attachments directory in S3.
+//
+// It is idempotent: it returns nil if the object does not exist.
+// This prevents errors when the database and S3 bucket are out of sync.
+func deleteBucketObject(bucket storage.S3Client, fileName string) error {
+	if fileName == "" {
+		return fmt.Errorf("deleteBucketObject: filename cannot be empty")
+	}
+
+	key := storage.PathAttachments + fileName
+	err := bucket.DeleteFile(key)
+
+	var noKey *types.NoSuchKey
+	if errors.As(err, &noKey) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func toTagsArray(tags string) []string {
