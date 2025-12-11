@@ -15,8 +15,11 @@ import (
 
 const PathAttachments = "attachments/"
 
+var ErrorEmptyKey = errors.New("key is empty")
+
 type S3Client interface {
 	UploadFile(data []byte, key string) error
+	DeleteFile(key string) error
 }
 
 type storageClient struct {
@@ -41,7 +44,7 @@ func NewStorageClient() (S3Client, error) {
 
 func (s *storageClient) UploadFile(data []byte, key string) error {
 	if key == "" {
-		return errors.New("key is empty")
+		return ErrorEmptyKey
 	}
 
 	mimeType := mime.TypeByExtension(filepath.Ext(key))
@@ -57,6 +60,23 @@ func (s *storageClient) UploadFile(data []byte, key string) error {
 	}
 
 	_, err := s.client.PutObject(context.Background(), input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *storageClient) DeleteFile(key string) error {
+	if key == "" {
+		return ErrorEmptyKey
+	}
+
+	input := &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}
+
+	_, err := s.client.DeleteObject(context.Background(), input)
 	if err != nil {
 		return err
 	}
