@@ -208,7 +208,7 @@ func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.Er
 		return apierror.NotFoundError
 	}
 
-	err = deleteBucketObject(n.S3, note.Content)
+	err = deleteBucketObject(n.S3, note)
 	if err != nil {
 		log.Errorf("failed to delete note: %v", err)
 		return apierror.InternalServerError
@@ -245,6 +245,10 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 		return "", apierror.InternalServerError
 	}
 	return filename, nil
+}
+
+func handleNoteDeletion() {
+
 }
 
 func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
@@ -302,7 +306,15 @@ func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 //
 // It is idempotent: it returns nil if the object does not exist.
 // This prevents errors when the database and S3 bucket are out of sync.
-func deleteBucketObject(bucket storage.S3Client, fileName string) error {
+func deleteBucketObject(bucket storage.S3Client, note *entity.Note) error {
+    fileName := note.Content
+
+    // If the note is a text/chart file, then there is nothing to delete from
+    // AWS, as we only store files on S3.
+    if note.NoteType != "REFERENCE" {
+        return nil 
+    }
+
 	if fileName == "" {
 		return fmt.Errorf("deleteBucketObject: filename cannot be empty")
 	}
