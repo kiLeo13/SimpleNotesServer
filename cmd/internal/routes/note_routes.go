@@ -149,7 +149,7 @@ func (n *DefaultNoteRoute) createFromFile(c echo.Context) error {
 		return c.JSON(401, apierror.InvalidAuthTokenError)
 	}
 
-	fileHeader, err := c.FormFile("file")
+	fileHeader, err := c.FormFile("content")
 	if err != nil {
 		return c.JSON(400, apierror.MissingNoteFileError)
 	}
