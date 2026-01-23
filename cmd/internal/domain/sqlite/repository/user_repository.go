@@ -27,6 +27,15 @@ func (u *DefaultUserRepository) FindAllInIDs(ids []int) ([]*entity.User, error) 
 	return users, nil
 }
 
+func (u *DefaultUserRepository) FindAll() ([]*entity.User, error) {
+	var users []*entity.User
+	err := u.db.Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (u *DefaultUserRepository) FindByID(id int) (*entity.User, error) {
 	var user entity.User
 	err := u.db.First(&user, id).Error
