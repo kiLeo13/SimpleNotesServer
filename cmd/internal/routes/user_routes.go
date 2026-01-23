@@ -10,7 +10,6 @@ import (
 )
 
 type UserService interface {
-	QueryUsers(req *service.QueryUsersRequest) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse

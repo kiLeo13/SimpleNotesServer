@@ -82,24 +82,6 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	return &UserService{UserRepo: userRepo, Validate: validate, Cognito: cogClient}
 }
 
-func (u *UserService) QueryUsers(req *QueryUsersRequest) ([]*UserResponse, apierror.ErrorResponse) {
-	if err := u.Validate.Struct(req); err != nil {
-		return nil, apierror.FromValidationError(err)
-	}
-
-	users, err := u.UserRepo.FindAllInIDs(req.IDs)
-	if err != nil {
-		log.Errorf("failed to fetch users: %v", err)
-		return nil, apierror.InternalServerError
-	}
-
-	resp := make([]*UserResponse, len(users))
-	for i, user := range users {
-		resp[i] = toUserResponse(user)
-	}
-	return resp, nil
-}
-
 func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.ErrorResponse) {
 	tokenData, err := utils.ParseTokenData(token)
 	if err != nil {
