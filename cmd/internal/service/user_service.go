@@ -25,6 +25,7 @@ const (
 type UserRepository interface {
 	FindAllInIDs(ids []int) ([]*entity.User, error)
 	FindByID(id int) (*entity.User, error)
+	FindAll() ([]*entity.User, error)
 	FindBySub(sub string) (*entity.User, error)
 	FindByEmail(email string) (*entity.User, error)
 	ExistsByEmail(email string) (bool, error)
@@ -80,6 +81,19 @@ type UserService struct {
 
 func NewUserService(userRepo UserRepository, validate *validator.Validate, cogClient cognitoclient.CognitoInterface) *UserService {
 	return &UserService{UserRepo: userRepo, Validate: validate, Cognito: cogClient}
+}
+
+func (u *UserService) GetUsers() ([]*UserResponse, apierror.ErrorResponse) {
+	users, err := u.UserRepo.FindAll()
+	if err != nil {
+		return nil, nil
+	}
+
+	resp := make([]*UserResponse, len(users))
+	for i, user := range users {
+		resp[i] = toUserResponse(user)
+	}
+	return resp, nil
 }
 
 func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.ErrorResponse) {

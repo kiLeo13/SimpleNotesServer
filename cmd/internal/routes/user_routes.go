@@ -10,6 +10,7 @@ import (
 )
 
 type UserService interface {
+	GetUsers() ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
@@ -24,6 +25,18 @@ type DefaultUserRoute struct {
 
 func NewUserDefault(userService UserService) *DefaultUserRoute {
 	return &DefaultUserRoute{UserService: userService}
+}
+
+func (u *DefaultUserRoute) GetUsers(c echo.Context) error {
+	users, apierr := u.UserService.GetUsers()
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+
+	resp := echo.Map{
+		"users": users,
+	}
+	return c.JSON(http.StatusOK, &resp)
 }
 
 func (u *DefaultUserRoute) GetUser(c echo.Context) error {
