@@ -27,21 +27,6 @@ func NewUserDefault(userService UserService) *DefaultUserRoute {
 	return &DefaultUserRoute{UserService: userService}
 }
 
-func (u *DefaultUserRoute) QueryUsers(c echo.Context) error {
-	var req service.QueryUsersRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
-	}
-
-	users, err := u.UserService.QueryUsers(&req)
-	if err != nil {
-		return c.JSON(err.Code(), err)
-	}
-
-	resp := echo.Map{"users": users}
-	return c.JSON(http.StatusOK, &resp)
-}
-
 func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 	rawId := strings.TrimSpace(c.Param("id"))
 	token := c.Request().Header.Get("Authorization")
@@ -68,9 +53,9 @@ func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 	}
 
 	resp := echo.Map{
-        "status": status,
-        "exists": *status == "TAKEN", // Legacy compatibility
-    }
+		"status": status,
+		"exists": *status == "TAKEN", // Legacy compatibility
+	}
 	return c.JSON(http.StatusOK, &resp)
 }
 

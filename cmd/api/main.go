@@ -82,7 +82,6 @@ func main() {
 	// Users
 	e.POST("/api/users/check-email", userRoutes.CheckEmail)
 	e.GET("/api/users/:id", userRoutes.GetUser)
-	e.POST("/api/users/query", userRoutes.QueryUsers)
 	e.POST("/api/users", userRoutes.CreateUser)
 	e.POST("/api/users/login", userRoutes.CreateLogin)
 	e.POST("/api/users/confirms", userRoutes.ConfirmSignup)
