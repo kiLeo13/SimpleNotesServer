@@ -9,12 +9,14 @@ import (
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
+	"strings"
 )
 
 type NoteService interface {
 	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
 	GetNoteByID(id int) (*service.NoteResponse, apierror.ErrorResponse)
-	CreateNote(req *service.NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
+	CreateFileNote(req *service.NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
+	CreateTextNote(req *service.TextNoteRequest, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
 	UpdateNote(id int, userSub string, req *service.UpdateNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
 	DeleteNote(noteId int, issuerId string) apierror.ErrorResponse
 }
@@ -55,31 +57,18 @@ func (n *DefaultNoteRoute) GetNote(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
-	jsonPayload := c.FormValue("json_payload")
-	if jsonPayload == "" {
-		return c.JSON(400, apierror.FormJSONRequiredError)
+	contentType := c.Request().Header.Get(echo.HeaderContentType)
+
+	if strings.HasPrefix(contentType, echo.MIMEApplicationJSON) {
+		return n.createFromText(c)
 	}
 
-	var req service.NoteRequest
-	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
-		return c.JSON(400, apierror.MalformedBodyError)
+	if strings.HasPrefix(contentType, echo.MIMEMultipartForm) {
+		return n.createFromFile(c)
 	}
 
-	data, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
-	}
-
-	fileHeader, err := c.FormFile("content")
-	if err != nil {
-		return c.JSON(400, apierror.MissingNoteFileError)
-	}
-
-	note, apierr := n.NoteService.CreateNote(&req, fileHeader, data.Sub)
-	if apierr != nil {
-		return c.JSON(apierr.Code(), apierr)
-	}
-	return c.JSON(http.StatusCreated, &note)
+	mediaTypeError := apierror.InvalidMediaTypeError
+	return c.JSON(http.StatusUnsupportedMediaType, &mediaTypeError)
 }
 
 func (n *DefaultNoteRoute) UpdateNote(c echo.Context) error {
@@ -124,4 +113,50 @@ func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
 		return c.JSON(serr.Code(), serr)
 	}
 	return c.NoContent(http.StatusOK)
+}
+
+func (n *DefaultNoteRoute) createFromText(c echo.Context) error {
+	var req service.TextNoteRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(400, apierror.MalformedBodyError)
+	}
+
+	data, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(401, apierror.InvalidAuthTokenError)
+	}
+
+	note, apierr := n.NoteService.CreateTextNote(&req, data.Sub)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.JSON(http.StatusCreated, &note)
+}
+
+func (n *DefaultNoteRoute) createFromFile(c echo.Context) error {
+	jsonPayload := strings.TrimSpace(c.FormValue("json_payload"))
+	if jsonPayload == "" {
+		return c.JSON(400, apierror.FormJSONRequiredError)
+	}
+
+	var req service.NoteRequest
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return c.JSON(400, apierror.MalformedBodyError)
+	}
+
+	data, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(401, apierror.InvalidAuthTokenError)
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return c.JSON(400, apierror.MissingNoteFileError)
+	}
+
+	note, apierr := n.NoteService.CreateFileNote(&req, fileHeader, data.Sub)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.JSON(http.StatusCreated, &note)
 }

@@ -19,7 +19,7 @@ import (
 
 const MaxNoteFileSizeBytes = 30 * 1024 * 1024
 
-var ValidNoteFileTypes = []string{"txt", "md", "pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
+var ValidNoteFileTypes = []string{"pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
 
 type NoteResponse struct {
 	ID          int      `json:"id"`
@@ -35,9 +35,17 @@ type NoteResponse struct {
 }
 
 type NoteRequest struct {
-	Name       string   `form:"name" validate:"required,min=2,max=80"`
-	Visibility string   `form:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
-	Tags       []string `form:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
+	Name       string   `json:"name" validate:"required,min=2,max=80"`
+	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
+	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
+}
+
+type TextNoteRequest struct {
+	Name       string   `json:"name" validate:"required,min=2,max=80"`
+	Content    string   `json:"content" validate:"required,max=1000000"`
+	NoteType   string   `json:"note_type" validate:"required,oneof=MARKDOWN FLOWCHART"`
+	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
+	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
 
 type UpdateNoteRequest struct {
@@ -91,7 +99,45 @@ func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorR
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) CreateTextNote(req *TextNoteRequest, subId string) (*NoteResponse, apierror.ErrorResponse) {
+	issuer, err := n.UserRepo.FindBySub(subId)
+	if err != nil {
+		log.Errorf("failed to fetch issuer user: %v", err)
+		return nil, apierror.InternalServerError
+	}
+
+	if issuer == nil || !issuer.IsAdmin {
+		return nil, apierror.UserNotAdmin
+	}
+
+	utils.Sanitize(req)
+	if valerr := n.Validate.Struct(req); valerr != nil {
+		return nil, apierror.FromValidationError(valerr)
+	}
+
+	tags := strings.Join(req.Tags, " ")
+	now := utils.NowUTC()
+
+	note := &entity.Note{
+		Name:        req.Name,
+		Content:     req.Content,
+		CreatedByID: issuer.ID,
+		Tags:        strings.ToLower(tags),
+		NoteType:    entity.NoteType(req.NoteType),
+		ContentSize: len(req.Content),
+		Visibility:  req.Visibility,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err = n.NoteRepo.Save(note); err != nil {
+		log.Errorf("failed to save note: %v", err)
+		return nil, apierror.InternalServerError
+	}
+	return toNoteResponse(note, true), nil
+}
+
+func (n *DefaultNoteService) CreateFileNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
 	issuer, err := n.UserRepo.FindBySub(issuerId)
 	if err != nil {
 		log.Errorf("failed to check if user %s is admin: %v", issuerId, err)
@@ -112,8 +158,7 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		return nil, apierr
 	}
 
-	ext := filepath.Ext(fileHeader.Filename)
-	filename, apierr := handleNoteUpload(n.S3, fileHeader)
+	filename, fileLength, apierr := handleNoteUpload(n.S3, fileHeader)
 	if apierr != nil {
 		return nil, apierr
 	}
@@ -125,8 +170,8 @@ func (n *DefaultNoteService) CreateNote(req *NoteRequest, fileHeader *multipart.
 		Content:     filename,
 		CreatedByID: issuer.ID,
 		Tags:        strings.ToLower(tags),
-		NoteType:    toNoteType(ext),
-		ContentSize: int(fileHeader.Size), // I really hope never exceed the 32-bits content length lol
+		NoteType:    entity.NoteTypeReference,
+		ContentSize: fileLength,
 		Visibility:  req.Visibility,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -227,28 +272,20 @@ func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.Er
 // will return immediately with the content of the text file.
 //
 // If the file IS NOT a text file, it uploads to the S3 bucket and returns the filename.
-func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (string, apierror.ErrorResponse) {
+func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (string, int, apierror.ErrorResponse) {
 	ext := filepath.Ext(fileheader.Filename)
 	bytes, apierr := readNoteFile(fileheader)
 	if apierr != nil {
-		return "", apierr
-	}
-
-	if isText(ext) {
-		return string(bytes), nil
+		return "", 0, apierr
 	}
 
 	filename := uuid.NewString() + ext
 	err := s3.UploadFile(bytes, storage.PathAttachments+filename)
 	if err != nil {
 		log.Errorf("failed to upload file: %v", err)
-		return "", apierror.InternalServerError
+		return "", 0, apierror.InternalServerError
 	}
-	return filename, nil
-}
-
-func handleNoteDeletion() {
-
+	return filename, len(bytes), nil
 }
 
 func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
@@ -283,8 +320,8 @@ func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorRespo
 }
 
 func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
-	content := ""
-	if note.NoteType == "REFERENCE" || forceContent {
+	var content string
+	if note.NoteType == entity.NoteTypeReference || forceContent {
 		content = note.Content
 	}
 
@@ -294,7 +331,7 @@ func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 		Content:     content,
 		Tags:        toTagsArray(note.Tags),
 		Visibility:  note.Visibility,
-		NoteType:    note.NoteType,
+		NoteType:    string(note.NoteType),
 		ContentSize: note.ContentSize,
 		CreatedByID: note.CreatedByID,
 		CreatedAt:   utils.FormatEpoch(note.CreatedAt),
@@ -307,13 +344,13 @@ func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
 // It is idempotent: it returns nil if the object does not exist.
 // This prevents errors when the database and S3 bucket are out of sync.
 func deleteBucketObject(bucket storage.S3Client, note *entity.Note) error {
-    fileName := note.Content
+	fileName := note.Content
 
-    // If the note is a text/chart file, then there is nothing to delete from
-    // AWS, as we only store files on S3.
-    if note.NoteType != "REFERENCE" {
-        return nil 
-    }
+	// If the note is a text/chart file, then there is nothing to delete from
+	// AWS, as we only store files on S3.
+	if note.NoteType != entity.NoteTypeReference {
+		return nil
+	}
 
 	if fileName == "" {
 		return fmt.Errorf("deleteBucketObject: filename cannot be empty")
@@ -338,15 +375,4 @@ func toTagsArray(tags string) []string {
 		return []string{}
 	}
 	return strings.Split(tags, " ")
-}
-
-func toNoteType(ext string) string {
-	if isText(ext) {
-		return "TEXT"
-	}
-	return "REFERENCE"
-}
-
-func isText(ext string) bool {
-	return ext == ".txt" || ext == ".md"
 }
