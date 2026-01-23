@@ -1,7 +1,7 @@
 package entity
 
 // Permission is a custom type for bitwise flags
-type Permission uint64
+type Permission int64
 
 const (
 	// PermissionAdministrator grants all permissions automatically.
