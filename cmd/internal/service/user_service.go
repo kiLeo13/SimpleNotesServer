@@ -62,7 +62,7 @@ type UserStatusRequest struct {
 type UserResponse struct {
 	ID        int    `json:"id"`
 	Username  string `json:"username"`
-	IsAdmin   bool   `json:"is_admin"`
+	Perms     int64  `json:"permissions"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -174,7 +174,6 @@ func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse 
 		Username:      req.Username,
 		Email:         req.Email,
 		EmailVerified: false,
-		IsAdmin:       false,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -360,7 +359,7 @@ func toUserResponse(user *entity.User) *UserResponse {
 	return &UserResponse{
 		ID:        user.ID,
 		Username:  user.Username,
-		IsAdmin:   user.IsAdmin,
+		Perms:     int64(user.Permissions),
 		CreatedAt: utils.FormatEpoch(user.CreatedAt),
 		UpdatedAt: utils.FormatEpoch(user.UpdatedAt),
 	}
