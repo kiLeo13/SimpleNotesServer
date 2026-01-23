@@ -106,8 +106,8 @@ func (n *DefaultNoteService) CreateTextNote(req *TextNoteRequest, subId string) 
 		return nil, apierror.InternalServerError
 	}
 
-	if issuer == nil || !issuer.IsAdmin {
-		return nil, apierror.UserNotAdmin
+	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionCreateNotes) {
+		return nil, apierror.UserMissingPermsError
 	}
 
 	utils.Sanitize(req)
@@ -145,8 +145,8 @@ func (n *DefaultNoteService) CreateFileNote(req *NoteRequest, fileHeader *multip
 	}
 
 	// I don't know how the user can even be nil here, but better safe than sorry?
-	if issuer == nil || !issuer.IsAdmin {
-		return nil, apierror.UserNotAdmin
+	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionCreateNotes) {
+		return nil, apierror.UserMissingPermsError
 	}
 
 	utils.Sanitize(req)
@@ -197,8 +197,8 @@ func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteR
 		return nil, apierror.InternalServerError
 	}
 
-	if user == nil || !user.IsAdmin {
-		return nil, apierror.UserNotAdmin
+	if user == nil || !user.Permissions.HasEffective(entity.PermissionEditNotes) {
+		return nil, apierror.UserMissingPermsError
 	}
 
 	note, err := n.NoteRepo.FindByID(id)
@@ -239,8 +239,8 @@ func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.Er
 		return apierror.InternalServerError
 	}
 
-	if issuer == nil || !issuer.IsAdmin {
-		return apierror.UserNotAdmin
+	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionDeleteNotes) {
+		return apierror.UserMissingPermsError
 	}
 
 	note, err := n.NoteRepo.FindByID(noteId)
