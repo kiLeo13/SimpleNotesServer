@@ -51,6 +51,7 @@ var (
 	MissingNoteFileError  = NewSimple(400, "Content file is required")
 	UserNotAdmin          = NewSimple(403, "Admin privileges are required for this operation")
 	MissingFileNameError  = NewSimple(400, "File name is required")
+	InvalidMediaTypeError = NewSimple(415, "Unsupported media type. Use application/json or multipart/form-data")
 
 	/*
 	 * Used for authentications
