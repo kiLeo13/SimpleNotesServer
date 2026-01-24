@@ -64,7 +64,6 @@ type UserResponse struct {
 	ID        int    `json:"id"`
 	Username  string `json:"username"`
 	Perms     int64  `json:"permissions"`
-	IsAdmin   bool   `json:"is_admin"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -357,7 +356,6 @@ func toUserResponse(user *entity.User) *UserResponse {
 		ID:        user.ID,
 		Username:  user.Username,
 		Perms:     int64(user.Permissions),
-		IsAdmin:   user.Permissions.HasRaw(entity.PermissionAdministrator),
 		CreatedAt: utils.FormatEpoch(user.CreatedAt),
 		UpdatedAt: utils.FormatEpoch(user.UpdatedAt),
 	}
