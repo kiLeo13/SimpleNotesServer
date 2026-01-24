@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"simplenotes/cmd/internal/service"
+	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type UserService interface {
-	GetUsers() ([]*service.UserResponse, apierror.ErrorResponse)
+	GetUsers(subId string) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
@@ -28,7 +29,12 @@ func NewUserDefault(userService UserService) *DefaultUserRoute {
 }
 
 func (u *DefaultUserRoute) GetUsers(c echo.Context) error {
-	users, apierr := u.UserService.GetUsers()
+	token, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(401, apierror.InvalidAuthTokenError)
+	}
+
+	users, apierr := u.UserService.GetUsers(token.Sub)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}

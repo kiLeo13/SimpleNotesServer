@@ -61,11 +61,12 @@ type UserStatusRequest struct {
 }
 
 type UserResponse struct {
-	ID        int    `json:"id"`
-	Username  string `json:"username"`
-	Perms     int64  `json:"permissions"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         int    `json:"id"`
+	Username   string `json:"username"`
+	Perms      int64  `json:"permissions"`
+	IsVerified *bool  `json:"is_verified,omitempty"` // Requires Manage Users
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 type UserLoginResponse struct {
@@ -83,15 +84,23 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	return &UserService{UserRepo: userRepo, Validate: validate, Cognito: cogClient}
 }
 
-func (u *UserService) GetUsers() ([]*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) GetUsers(subId string) ([]*UserResponse, apierror.ErrorResponse) {
 	users, err := u.UserRepo.FindAll()
 	if err != nil {
 		return nil, nil
 	}
 
+	requester, err := u.UserRepo.FindBySub(subId)
+	if err != nil {
+		// If we are unable to find the user, we log the error
+		// but still respond the user. By omitting `is_verified` we are already fine
+		log.Errorf("failed to find user by sub id %s", subId)
+	}
+
 	resp := make([]*UserResponse, len(users))
+	hasMngUsers := requester != nil && requester.Permissions.HasEffective(entity.PermissionManageUsers)
 	for i, user := range users {
-		resp[i] = toUserResponse(user)
+		resp[i] = toFullUserResponse(user, hasMngUsers)
 	}
 	return resp, nil
 }
@@ -349,6 +358,15 @@ func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string)
 		return utils.MapCognitoError(err)
 	}
 	return nil
+}
+
+func toFullUserResponse(user *entity.User, verified bool) *UserResponse {
+	part := toUserResponse(user)
+
+	if verified {
+		part.IsVerified = &user.EmailVerified
+	}
+	return part
 }
 
 func toUserResponse(user *entity.User) *UserResponse {
