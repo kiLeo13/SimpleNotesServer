@@ -43,10 +43,6 @@ type UserLoginRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=64"`
 }
 
-type QueryUsersRequest struct {
-	IDs []int `json:"ids" validate:"required,min=1,max=100"`
-}
-
 type ConfirmSignupRequest struct {
 	Email string `json:"email" validate:"required,email"`
 	Code  string `json:"code" validate:"required,min=1,max=2048"` // 2048????? Just respecting AWS' docs 🤷‍♂️
