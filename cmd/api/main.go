@@ -5,9 +5,9 @@ import (
 	"os"
 	"simplenotes/cmd/internal/domain/sqlite"
 	"simplenotes/cmd/internal/domain/sqlite/repository"
+	handler2 "simplenotes/cmd/internal/http/handler"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
-	"simplenotes/cmd/internal/routes"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils/validators"
 
@@ -64,9 +64,9 @@ func main() {
 	userService := service.NewUserService(userRepo, validate, cogClient)
 	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
 
-	// Gettings routes
-	noteRoutes := routes.NewNoteDefault(noteService)
-	userRoutes := routes.NewUserDefault(userService)
+	// Gettings handler
+	noteRoutes := handler2.NewNoteDefault(noteService)
+	userRoutes := handler2.NewUserDefault(userService)
 
 	e := echo.New()
 	e.Use(middleware.CORS())
