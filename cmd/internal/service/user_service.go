@@ -47,7 +47,7 @@ type UserLoginRequest struct {
 
 type UpdateUserRequest struct {
 	Username  *string `json:"username" validate:"omitempty,min=2,max=80"`
-	Perms     *int64  `json:"perms" validate:"omitempty,min=0"`
+	Perms     *int64  `json:"permissions" validate:"omitempty,min=0"`
 	Suspended *bool   `json:"suspended" validate:"omitempty"`
 }
 
