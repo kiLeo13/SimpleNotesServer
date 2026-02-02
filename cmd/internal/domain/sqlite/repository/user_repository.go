@@ -93,6 +93,8 @@ func (u *DefaultUserRepository) ExistsActiveByEmail(email string) (bool, error) 
 // SoftDelete sets the active flag to false.
 func (u *DefaultUserRepository) SoftDelete(user *entity.User) error {
 	user.Active = false
+	user.Email = ""
+	user.SubUUID = ""
 	user.UpdatedAt = utils.NowUTC()
 
 	return u.db.Model(user).Updates(map[string]interface{}{
