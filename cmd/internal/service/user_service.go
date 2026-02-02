@@ -264,6 +264,10 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror
 		return nil, apierror.IDPUserNotFoundError
 	}
 
+	if user.Suspended {
+		return nil, apierror.MissingAccessError
+	}
+
 	credentials := &cognitoclient.UserLogin{
 		Email:    req.Email,
 		Password: req.Password,

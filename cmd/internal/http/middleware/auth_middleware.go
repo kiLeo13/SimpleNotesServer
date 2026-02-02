@@ -36,7 +36,7 @@ func NewAuthMiddleware(cfg *AuthMiddlewareConfig) echo.MiddlewareFunc {
 			}
 
 			if user.Suspended || !user.Active {
-				return c.JSON(http.StatusForbidden, apierror.NewForbiddenError("Missing access"))
+				return c.JSON(http.StatusForbidden, apierror.MissingAccessError)
 			}
 
 			c.Set("user", user)
