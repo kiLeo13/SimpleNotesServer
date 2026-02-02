@@ -144,3 +144,11 @@ func NewNoteContentTooLargeError(max int64) *APIError {
 func NewInvalidFileExtError(ext string) *APIError {
 	return NewSimple(http.StatusBadRequest, "Invalid file extension: %s", ext)
 }
+
+func NewPermissionError(bitmask int64) *APIError {
+	return NewSimple(http.StatusForbidden, "Missing permissions: %d", bitmask)
+}
+
+func NewForbiddenError(msg string) *APIError {
+	return NewSimple(http.StatusForbidden, msg)
+}
