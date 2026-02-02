@@ -29,7 +29,7 @@ func (p *UserPolicy) CanUpdateProfile(actor, target *entity.User) apierror.Error
 
 	// Admin Immunity
 	if target.Permissions.Has(admin) {
-		return forbiddenError("administrators cannot be modified")
+		return forbiddenError("Administrators cannot be modified")
 	}
 
 	if !actor.Permissions.HasEffective(mngUsers) {
@@ -47,12 +47,12 @@ func (p *UserPolicy) CanUpdatePermissions(actor, target *entity.User, newPerms e
 
 	// Admin Immunity
 	if target.Permissions.Has(admin) {
-		return forbiddenError("administrators cannot be modified")
+		return forbiddenError("Administrators cannot be modified")
 	}
 
 	// Cannot grant Admin via API
 	if newPerms.Has(admin) {
-		return forbiddenError("cannot grant administrator privileges via API")
+		return forbiddenError("Cannot grant administrator privileges via API")
 	}
 
 	// Users with this permission cannot remove PermissionManageUsers of other users
@@ -60,7 +60,7 @@ func (p *UserPolicy) CanUpdatePermissions(actor, target *entity.User, newPerms e
 	isManager := newPerms.Has(mngUsers)
 
 	if wasManager && !isManager {
-		return forbiddenError("cannot revoke 'Manage Users' capability from an existing manager")
+		return forbiddenError("Cannot revoke 'Manage Users' capability from an existing manager")
 	}
 	return nil
 }
@@ -71,10 +71,14 @@ func (p *UserPolicy) CanPunishUser(actor, target *entity.User) apierror.ErrorRes
 		return permError(punishUsers)
 	}
 
+	if actor.ID == target.ID {
+		return forbiddenError("Cannot punish yourself")
+	}
+
 	// Users with Admin and PermissionManagePerms are immune
 	if target.Permissions.Has(admin) ||
 		target.Permissions.Has(mngPerms) {
-		return forbiddenError("target user is immune to punishment actions")
+		return forbiddenError("Target user is immune to punishment actions")
 	}
 	return nil
 }
