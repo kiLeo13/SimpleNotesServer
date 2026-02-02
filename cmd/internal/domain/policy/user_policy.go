@@ -52,15 +52,18 @@ func (p *UserPolicy) CanUpdatePermissions(actor, target *entity.User, newPerms e
 
 	// Cannot grant Admin via API
 	if newPerms.Has(admin) {
-		return forbiddenError("Cannot grant administrator privileges via API")
+		return forbiddenError("Cannot grant administrator privileges")
 	}
 
-	// Users with this permission cannot remove PermissionManageUsers of other users
-	wasManager := target.Permissions.Has(mngUsers)
-	isManager := newPerms.Has(mngUsers)
+	isActorAdmin := actor.Permissions.Has(admin)
+	if !isActorAdmin {
+		// Non-Admins cannot change the state of 'Manage Permissions'
+		wasPermManager := target.Permissions.Has(entity.PermissionManagePerms)
+		isPermManager := newPerms.Has(entity.PermissionManagePerms)
 
-	if wasManager && !isManager {
-		return forbiddenError("Cannot revoke 'Manage Users' capability from an existing manager")
+		if wasPermManager != isPermManager {
+			return apierror.NewForbiddenError("Only admins can grant/revoke 'Manage Permissions'")
+		}
 	}
 	return nil
 }
