@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"simplenotes/cmd/internal/domain/policy"
 	"simplenotes/cmd/internal/domain/sqlite"
 	"simplenotes/cmd/internal/domain/sqlite/repository"
 	handler2 "simplenotes/cmd/internal/http/handler"
@@ -56,12 +57,15 @@ func main() {
 		panic(err)
 	}
 
+	// Policies
+	userPolicy := policy.NewUserPolicy()
+
 	// Gettings repos
 	noteRepo := repository.NewNoteRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
 	// Getting services
-	userService := service.NewUserService(userRepo, validate, cogClient)
+	userService := service.NewUserService(userRepo, validate, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
 
 	// Gettings handler
@@ -83,6 +87,7 @@ func main() {
 	e.POST("/api/users/check-email", userRoutes.CheckEmail)
 	e.GET("/api/users", userRoutes.GetUsers)
 	e.GET("/api/users/:id", userRoutes.GetUser)
+	e.PATCH("/api/users/:id", userRoutes.UpdateUser)
 	e.POST("/api/users", userRoutes.CreateUser)
 	e.POST("/api/users/login", userRoutes.CreateLogin)
 	e.POST("/api/users/confirms", userRoutes.ConfirmSignup)
