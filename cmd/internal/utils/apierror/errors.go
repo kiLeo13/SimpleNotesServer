@@ -45,6 +45,7 @@ var (
 	MalformedBodyError  = NewSimple(400, "Malformed form body")
 	InternalServerError = NewSimple(500, "Internal server error")
 	UnauthorizedError   = NewSimple(401, "Unauthorized")
+	MissingAccessError  = NewSimple(403, "Missing access")
 
 	NotFoundError         = NewSimple(404, "Resource not found")
 	FormJSONRequiredError = NewSimple(400, "Form field `json_payload` is required")
