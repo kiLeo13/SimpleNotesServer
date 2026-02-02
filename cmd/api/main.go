@@ -120,6 +120,7 @@ func registerRoutes(
 	protected.GET("/users", userH.GetUsers)
 	protected.GET("/users/:id", userH.GetUser)
 	protected.PATCH("/users/:id", userH.UpdateUser)
+	protected.DELETE("/users/:id", userH.DeleteUser)
 }
 
 func registerValidators(validate *validator.Validate) {
