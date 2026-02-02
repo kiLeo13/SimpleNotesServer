@@ -15,6 +15,7 @@ type UserService interface {
 	GetUsers(requester *entity.User) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(requester *entity.User, rawId string) (*service.UserResponse, apierror.ErrorResponse)
 	UpdateUser(requester *entity.User, targetId string, req *service.UpdateUserRequest) (*service.UserResponse, apierror.ErrorResponse)
+	DeleteUser(requester *entity.User, targetId string) apierror.ErrorResponse
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
@@ -80,6 +81,24 @@ func (u *DefaultUserRoute) UpdateUser(c echo.Context) error {
 		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.JSON(http.StatusOK, newUser)
+}
+
+func (u *DefaultUserRoute) DeleteUser(c echo.Context) error {
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
+	targetId := strings.TrimSpace(c.Param("id"))
+	if targetId == "" {
+		return c.JSON(http.StatusBadRequest, apierror.NewMissingParamError("id"))
+	}
+
+	apierr := u.UserService.DeleteUser(user, targetId)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.NoContent(http.StatusOK)
 }
 
 func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
