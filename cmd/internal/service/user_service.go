@@ -24,12 +24,13 @@ const (
 )
 
 type UserRepository interface {
-	FindAllInIDs(ids []int) ([]*entity.User, error)
+	FindAllActive() ([]*entity.User, error)
+	FindActiveBySub(sub string) (*entity.User, error)
+	FindActiveByEmail(email string) (*entity.User, error)
+	FindActiveByID(id int) (*entity.User, error)
 	FindByID(id int) (*entity.User, error)
-	FindAll() ([]*entity.User, error)
-	FindBySub(sub string) (*entity.User, error)
-	FindByEmail(email string) (*entity.User, error)
-	ExistsByEmail(email string) (bool, error)
+	SoftDelete(user *entity.User) error
+	ExistsActiveByEmail(email string) (bool, error)
 	Save(user *entity.User) error
 }
 
@@ -94,31 +95,21 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	}
 }
 
-func (u *UserService) GetUsers(requester *entity.User) ([]*UserResponse, apierror.ErrorResponse) {
-	users, err := u.UserRepo.FindAll()
+func (u *UserService) GetUsers(actor *entity.User) ([]*UserResponse, apierror.ErrorResponse) {
+	users, err := u.UserRepo.FindAllActive()
 	if err != nil {
 		return nil, nil
 	}
 
 	resp := make([]*UserResponse, len(users))
-	hasMngUsers := requester.Permissions.HasEffective(entity.PermissionManageUsers)
-	hasPunishUsers := requester.Permissions.HasEffective(entity.PermissionPunishUsers)
 	for i, user := range users {
-		resp[i] = toUserResponse(user)
-
-		if hasMngUsers {
-			resp[i].IsVerified = &user.EmailVerified
-		}
-
-		if hasPunishUsers || hasMngUsers {
-			resp[i].Suspended = &user.Suspended
-		}
+		resp[i] = toUserResponse(user, actor)
 	}
 	return resp, nil
 }
 
-func (u *UserService) GetUser(requester *entity.User, rawId string) (*UserResponse, apierror.ErrorResponse) {
-	user, apierr := u.fetchUser(requester, rawId)
+func (u *UserService) GetUser(actor *entity.User, rawId string) (*UserResponse, apierror.ErrorResponse) {
+	user, apierr := u.fetchUser(actor, rawId, true)
 	if apierr != nil {
 		return nil, apierr
 	}
@@ -127,23 +118,23 @@ func (u *UserService) GetUser(requester *entity.User, rawId string) (*UserRespon
 		return nil, apierror.NotFoundError
 	}
 
-	resp := toUserResponse(user)
+	resp := toUserResponse(user, actor)
 	return resp, nil
 }
 
-func (u *UserService) UpdateUser(requester *entity.User, targetId string, req *UpdateUserRequest) (*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *UpdateUserRequest) (*UserResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
 	}
 
-	target, apierr := u.fetchByID(targetId)
+	target, apierr := u.fetchByID(targetId, false)
 	if apierr != nil {
 		return nil, apierr
 	}
 
 	updater := &userUpdater{
-		actor:  requester,
+		actor:  actor,
 		target: target,
 		policy: u.UserPolicy,
 	}
@@ -159,11 +150,33 @@ func (u *UserService) UpdateUser(requester *entity.User, targetId string, req *U
 	if updater.dirty {
 		target.UpdatedAt = utils.NowUTC()
 		if err := u.UserRepo.Save(target); err != nil {
-			log.Errorf("requester %s failed to update user %s: %v", requester.SubUUID, targetId, err)
+			log.Errorf("actor %s failed to update user %s: %v", actor.SubUUID, targetId, err)
 			return nil, apierror.InternalServerError
 		}
 	}
-	return toUserResponse(target), nil
+	return toUserResponse(target, actor), nil
+}
+
+func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierror.ErrorResponse {
+	target, err := u.fetchByID(targetRawID, false)
+	if err != nil {
+		log.Errorf("failed to fetch user by ID %s: %v", targetRawID, err)
+		return apierror.InternalServerError
+	}
+
+	if target == nil {
+		return apierror.NotFoundError
+	}
+
+	if perr := u.UserPolicy.CanDeleteUser(actor, target); perr != nil {
+		return perr
+	}
+
+	if derr := u.UserRepo.SoftDelete(target); derr != nil {
+		log.Errorf("failed to delete user %d: %v", target.ID, derr)
+		return apierror.InternalServerError
+	}
+	return nil
 }
 
 func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror.ErrorResponse) {
@@ -173,7 +186,7 @@ func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror
 	}
 
 	var status EmailStatus
-	user, err := u.UserRepo.FindByEmail(req.Email)
+	user, err := u.UserRepo.FindActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to check if user (%s) exists: %v", req.Email, err)
 		return nil, apierror.InternalServerError
@@ -198,7 +211,7 @@ func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse 
 		return apierror.FromValidationError(err)
 	}
 
-	found, err := u.UserRepo.ExistsByEmail(req.Email)
+	found, err := u.UserRepo.ExistsActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to check if user already exists: %v", err)
 		return apierror.InternalServerError
@@ -241,7 +254,7 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror
 		return nil, apierror.FromValidationError(err)
 	}
 
-	user, err := u.UserRepo.FindByEmail(req.Email)
+	user, err := u.UserRepo.FindActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to fetch user from database: %v", err)
 		return nil, apierror.InternalServerError
@@ -268,7 +281,7 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) apierror.ErrorRes
 		return apierror.FromValidationError(err)
 	}
 
-	user, err := u.UserRepo.FindByEmail(req.Email)
+	user, err := u.UserRepo.FindActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to fetch user from database: %v", err)
 		return apierror.InternalServerError
@@ -307,7 +320,7 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.Err
 		return apierror.FromValidationError(err)
 	}
 
-	user, err := u.UserRepo.FindByEmail(req.Email)
+	user, err := u.UserRepo.FindActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to find user (%s) by email: %v", req.Email, err)
 		return apierror.InternalServerError
@@ -337,15 +350,18 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.Err
 	return nil
 }
 
-func (u *UserService) fetchUser(requester *entity.User, rawId string) (*entity.User, apierror.ErrorResponse) {
+// fetchUser tries to resolve the params into a real user.
+//
+// When 'force' is 'true', even deleted users can be returned.
+func (u *UserService) fetchUser(requester *entity.User, rawId string, force bool) (*entity.User, apierror.ErrorResponse) {
 	if rawId == "@me" {
 		return requester, nil
 	}
-	return u.fetchByID(rawId)
+	return u.fetchByID(rawId, force)
 }
 
 func (u *UserService) fetchBySub(sub string) (*entity.User, apierror.ErrorResponse) {
-	user, err := u.UserRepo.FindBySub(sub)
+	user, err := u.UserRepo.FindActiveBySub(sub)
 	if err != nil {
 		log.Errorf("failed to find user (%s) by sub: %v", sub, err)
 		return nil, apierror.InternalServerError
@@ -353,12 +369,19 @@ func (u *UserService) fetchBySub(sub string) (*entity.User, apierror.ErrorRespon
 	return user, nil
 }
 
-func (u *UserService) fetchByID(rawId string) (*entity.User, apierror.ErrorResponse) {
+func (u *UserService) fetchByID(rawId string, force bool) (*entity.User, apierror.ErrorResponse) {
 	userId, err := strconv.Atoi(rawId)
 	if err != nil {
 		return nil, apierror.NewInvalidParamTypeError("id", "int32")
 	}
-	user, err := u.UserRepo.FindByID(userId)
+
+	var user *entity.User
+	if force {
+		user, err = u.UserRepo.FindByID(userId)
+	} else {
+		user, err = u.UserRepo.FindActiveByID(userId)
+	}
+
 	if err != nil {
 		log.Errorf("failed to find user (%s) by id: %v", rawId, err)
 		return nil, apierror.InternalServerError
@@ -402,12 +425,37 @@ func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string)
 	return nil
 }
 
-func toUserResponse(user *entity.User) *UserResponse {
-	return &UserResponse{
+func toUserResponse(user, requester *entity.User) *UserResponse {
+	if !user.Active {
+		return toDeletedUserResponse(user)
+	}
+
+	resp := &UserResponse{
 		ID:        user.ID,
 		Username:  user.Username,
 		Perms:     int64(user.Permissions),
 		CreatedAt: utils.FormatEpoch(user.CreatedAt),
 		UpdatedAt: utils.FormatEpoch(user.UpdatedAt),
+	}
+
+	hasMngUsers := requester.Permissions.HasEffective(entity.PermissionManageUsers)
+	hasPunishUsers := requester.Permissions.HasEffective(entity.PermissionPunishUsers)
+	if hasMngUsers {
+		resp.IsVerified = &user.EmailVerified
+	}
+
+	if hasPunishUsers || hasMngUsers {
+		resp.Suspended = &user.Suspended
+	}
+	return resp
+}
+
+func toDeletedUserResponse(user *entity.User) *UserResponse {
+	return &UserResponse{
+		ID:        user.ID,
+		Username:  "Deleted User",
+		Perms:     0,
+		CreatedAt: utils.FormatEpoch(0),
+		UpdatedAt: utils.FormatEpoch(0),
 	}
 }

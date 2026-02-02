@@ -9,7 +9,7 @@ import (
 )
 
 type UserRepository interface {
-	FindBySub(sub string) (*entity.User, error)
+	FindActiveBySub(sub string) (*entity.User, error)
 }
 
 type AuthMiddlewareConfig struct {
@@ -25,7 +25,7 @@ func NewAuthMiddleware(cfg *AuthMiddlewareConfig) echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, apierror.InvalidAuthTokenError)
 			}
 
-			user, err := cfg.UserRepo.FindBySub(tokenData.Sub)
+			user, err := cfg.UserRepo.FindActiveBySub(tokenData.Sub)
 			if err != nil {
 				return c.JSON(http.StatusInternalServerError, apierror.InternalServerError)
 			}
