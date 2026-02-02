@@ -11,5 +11,5 @@ type User struct {
 	Active        bool       `gorm:"not null;default:true"`
 	Suspended     bool       `gorm:"not null;default:false"`
 	CreatedAt     int64      `gorm:"not null"`
-	UpdatedAt     int64      `gorm:"not null"`
+	UpdatedAt     int64      `gorm:"not null;autoUpdateTime:false"`
 }
