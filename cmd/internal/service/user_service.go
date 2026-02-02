@@ -2,6 +2,7 @@ package service
 
 import (
 	"simplenotes/cmd/internal/domain/entity"
+	"simplenotes/cmd/internal/domain/policy"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -43,9 +44,14 @@ type UserLoginRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=64"`
 }
 
+type UpdateUserRequest struct {
+	Username *string `json:"username" validate:"omitempty,min=2,max=80"`
+	Perms    *int64  `json:"perms" validate:"omitempty,min=0"`
+}
+
 type ConfirmSignupRequest struct {
 	Email string `json:"email" validate:"required,email"`
-	Code  string `json:"code" validate:"required,min=1,max=2048"` // 2048????? Just respecting AWS' docs 🤷‍♂️
+	Code  string `json:"code" validate:"required,min=1,max=8"`
 }
 
 type ResendConfirmRequest struct {
@@ -71,13 +77,19 @@ type UserLoginResponse struct {
 }
 
 type UserService struct {
-	UserRepo UserRepository
-	Validate *validator.Validate
-	Cognito  cognitoclient.CognitoInterface
+	UserRepo   UserRepository
+	Validate   *validator.Validate
+	Cognito    cognitoclient.CognitoInterface
+	UserPolicy *policy.UserPolicy
 }
 
-func NewUserService(userRepo UserRepository, validate *validator.Validate, cogClient cognitoclient.CognitoInterface) *UserService {
-	return &UserService{UserRepo: userRepo, Validate: validate, Cognito: cogClient}
+func NewUserService(userRepo UserRepository, validate *validator.Validate, cogClient cognitoclient.CognitoInterface, userPolicy *policy.UserPolicy) *UserService {
+	return &UserService{
+		UserRepo:   userRepo,
+		Validate:   validate,
+		Cognito:    cogClient,
+		UserPolicy: userPolicy,
+	}
 }
 
 func (u *UserService) GetUsers(subId string) ([]*UserResponse, apierror.ErrorResponse) {
@@ -118,6 +130,46 @@ func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.Erro
 
 	resp := toUserResponse(user)
 	return resp, nil
+}
+
+func (u *UserService) UpdateUser(req *UpdateUserRequest, targetId, subId string) (*UserResponse, apierror.ErrorResponse) {
+	utils.Sanitize(req)
+	if err := u.Validate.Struct(req); err != nil {
+		return nil, apierror.FromValidationError(err)
+	}
+
+	requester, err := u.UserRepo.FindBySub(subId)
+	if err != nil {
+		log.Errorf("failed to find user by sub id %s", subId)
+		return nil, apierror.InternalServerError
+	}
+
+	target, apierr := u.fetchByID(targetId)
+	if apierr != nil {
+		return nil, apierr
+	}
+
+	updater := &userUpdater{
+		actor:  requester,
+		target: target,
+		policy: u.UserPolicy,
+	}
+
+	updater.setProfileString(req.Username, &target.Username)
+	updater.setPermissions(req.Perms)
+
+	if updater.err != nil {
+		return nil, updater.err
+	}
+
+	if updater.dirty {
+		target.UpdatedAt = utils.NowUTC()
+		if err := u.UserRepo.Save(target); err != nil {
+			log.Errorf("requester %s failed to update user %s: %v", subId, targetId, err)
+			return nil, apierror.InternalServerError
+		}
+	}
+	return toUserResponse(target), nil
 }
 
 func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror.ErrorResponse) {

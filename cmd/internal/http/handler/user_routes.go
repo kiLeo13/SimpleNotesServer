@@ -13,6 +13,7 @@ import (
 type UserService interface {
 	GetUsers(subId string) ([]*service.UserResponse, apierror.ErrorResponse)
 	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
+	UpdateUser(req *service.UpdateUserRequest, targetId, subId string) (*service.UserResponse, apierror.ErrorResponse)
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
@@ -57,6 +58,25 @@ func (u *DefaultUserRoute) GetUser(c echo.Context) error {
 		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.JSON(http.StatusOK, user)
+}
+
+func (u *DefaultUserRoute) UpdateUser(c echo.Context) error {
+	rawId := strings.TrimSpace(c.Param("id"))
+	var req service.UpdateUserRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
+	}
+
+	token, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, apierror.InvalidAuthTokenError)
+	}
+
+	newUser, apierr := u.UserService.UpdateUser(&req, rawId, token.Sub)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.JSON(http.StatusOK, newUser)
 }
 
 func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
