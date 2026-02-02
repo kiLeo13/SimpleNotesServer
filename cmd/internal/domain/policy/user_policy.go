@@ -7,9 +7,10 @@ import (
 
 const (
 	admin       = entity.PermissionAdministrator
+	mngUsers    = entity.PermissionManageUsers
+	delUsers    = entity.PermissionDeleteUsers
 	mngPerms    = entity.PermissionManagePerms
 	punishUsers = entity.PermissionPunishUsers
-	mngUsers    = entity.PermissionManageUsers
 )
 
 // UserPolicy encapsulates all business rules for user manipulation.
@@ -26,6 +27,7 @@ func (p *UserPolicy) CanUpdateProfile(actor, target *entity.User) apierror.Error
 		return nil
 	}
 
+	// Admin Immunity
 	if target.Permissions.Has(admin) {
 		return forbiddenError("administrators cannot be modified")
 	}
@@ -38,22 +40,21 @@ func (p *UserPolicy) CanUpdateProfile(actor, target *entity.User) apierror.Error
 
 // CanUpdatePermissions checks if 'actor' can change 'target' permissions to 'newPerms'
 func (p *UserPolicy) CanUpdatePermissions(actor, target *entity.User, newPerms entity.Permission) apierror.ErrorResponse {
-	// Rule 1: Actor must have ManagePerms
+	// Actor must have ManagePerms
 	if !actor.Permissions.HasEffective(mngPerms) {
 		return permError(mngPerms)
 	}
 
-	// Rule 2: Admin Immunity
+	// Admin Immunity
 	if target.Permissions.Has(admin) {
 		return forbiddenError("administrators cannot be modified")
 	}
 
-	// Rule 3: Cannot grant Admin via API
+	// Cannot grant Admin via API
 	if newPerms.Has(admin) {
 		return forbiddenError("cannot grant administrator privileges via API")
 	}
 
-	// Rule 4: Sticky Permission Constraint
 	// Users with this permission cannot remove PermissionManageUsers of other users
 	wasManager := target.Permissions.Has(mngUsers)
 	isManager := newPerms.Has(mngUsers)
@@ -70,12 +71,26 @@ func (p *UserPolicy) CanPunishUser(actor, target *entity.User) apierror.ErrorRes
 		return permError(punishUsers)
 	}
 
-	// Rule 2: Immunity check
 	// Users with Admin and PermissionManagePerms are immune
 	if target.Permissions.Has(admin) ||
 		target.Permissions.Has(mngPerms) {
 		return forbiddenError("target user is immune to punishment actions")
 	}
+	return nil
+}
+
+// CanDeleteUser checks if 'actor' can soft-delete 'target'.
+func (p *UserPolicy) CanDeleteUser(actor, target *entity.User) apierror.ErrorResponse {
+	// Capability Check
+	if !actor.Permissions.HasEffective(delUsers) {
+		return permError(delUsers)
+	}
+
+	// Admin Immunity
+	if target.Permissions.Has(admin) {
+		return forbiddenError("administrators cannot be deleted")
+	}
+
 	return nil
 }
 

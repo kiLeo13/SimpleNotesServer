@@ -45,8 +45,9 @@ type UserLoginRequest struct {
 }
 
 type UpdateUserRequest struct {
-	Username *string `json:"username" validate:"omitempty,min=2,max=80"`
-	Perms    *int64  `json:"perms" validate:"omitempty,min=0"`
+	Username  *string `json:"username" validate:"omitempty,min=2,max=80"`
+	Perms     *int64  `json:"perms" validate:"omitempty,min=0"`
+	Suspended *bool   `json:"suspended" validate:"omitempty"`
 }
 
 type ConfirmSignupRequest struct {
@@ -66,7 +67,8 @@ type UserResponse struct {
 	ID         int    `json:"id"`
 	Username   string `json:"username"`
 	Perms      int64  `json:"permissions"`
-	IsVerified *bool  `json:"is_verified,omitempty"` // Requires Manage Users
+	IsVerified *bool  `json:"is_verified,omitempty"` // Req (Manage Users)
+	Suspended  *bool  `json:"suspended,omitempty"`   // Req (Manage Users | Punish Users)
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
 }
@@ -92,34 +94,31 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	}
 }
 
-func (u *UserService) GetUsers(subId string) ([]*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) GetUsers(requester *entity.User) ([]*UserResponse, apierror.ErrorResponse) {
 	users, err := u.UserRepo.FindAll()
 	if err != nil {
 		return nil, nil
 	}
 
-	requester, err := u.UserRepo.FindBySub(subId)
-	if err != nil {
-		// If we are unable to find the user, we log the error
-		// but still respond the user. By omitting `is_verified` we are already fine
-		log.Errorf("failed to find user by sub id %s", subId)
-	}
-
 	resp := make([]*UserResponse, len(users))
-	hasMngUsers := requester != nil && requester.Permissions.HasEffective(entity.PermissionManageUsers)
+	hasMngUsers := requester.Permissions.HasEffective(entity.PermissionManageUsers)
+	hasPunishUsers := requester.Permissions.HasEffective(entity.PermissionPunishUsers)
 	for i, user := range users {
-		resp[i] = toFullUserResponse(user, hasMngUsers)
+		resp[i] = toUserResponse(user)
+
+		if hasMngUsers {
+			resp[i].IsVerified = &user.EmailVerified
+		}
+
+		if hasPunishUsers || hasMngUsers {
+			resp[i].Suspended = &user.Suspended
+		}
 	}
 	return resp, nil
 }
 
-func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.ErrorResponse) {
-	tokenData, err := utils.ParseTokenData(token)
-	if err != nil {
-		return nil, apierror.InvalidAuthTokenError
-	}
-
-	user, apierr := u.fetchUser(rawId, tokenData.Sub)
+func (u *UserService) GetUser(requester *entity.User, rawId string) (*UserResponse, apierror.ErrorResponse) {
+	user, apierr := u.fetchUser(requester, rawId)
 	if apierr != nil {
 		return nil, apierr
 	}
@@ -132,16 +131,10 @@ func (u *UserService) GetUser(token, rawId string) (*UserResponse, apierror.Erro
 	return resp, nil
 }
 
-func (u *UserService) UpdateUser(req *UpdateUserRequest, targetId, subId string) (*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) UpdateUser(requester *entity.User, targetId string, req *UpdateUserRequest) (*UserResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
-	}
-
-	requester, err := u.UserRepo.FindBySub(subId)
-	if err != nil {
-		log.Errorf("failed to find user by sub id %s", subId)
-		return nil, apierror.InternalServerError
 	}
 
 	target, apierr := u.fetchByID(targetId)
@@ -157,6 +150,7 @@ func (u *UserService) UpdateUser(req *UpdateUserRequest, targetId, subId string)
 
 	updater.setProfileString(req.Username, &target.Username)
 	updater.setPermissions(req.Perms)
+	updater.setSuspended(req.Suspended)
 
 	if updater.err != nil {
 		return nil, updater.err
@@ -165,7 +159,7 @@ func (u *UserService) UpdateUser(req *UpdateUserRequest, targetId, subId string)
 	if updater.dirty {
 		target.UpdatedAt = utils.NowUTC()
 		if err := u.UserRepo.Save(target); err != nil {
-			log.Errorf("requester %s failed to update user %s: %v", subId, targetId, err)
+			log.Errorf("requester %s failed to update user %s: %v", requester.SubUUID, targetId, err)
 			return nil, apierror.InternalServerError
 		}
 	}
@@ -343,9 +337,9 @@ func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.Err
 	return nil
 }
 
-func (u *UserService) fetchUser(rawId, sub string) (*entity.User, apierror.ErrorResponse) {
+func (u *UserService) fetchUser(requester *entity.User, rawId string) (*entity.User, apierror.ErrorResponse) {
 	if rawId == "@me" {
-		return u.fetchBySub(sub)
+		return requester, nil
 	}
 	return u.fetchByID(rawId)
 }
@@ -406,15 +400,6 @@ func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string)
 		return utils.MapCognitoError(err)
 	}
 	return nil
-}
-
-func toFullUserResponse(user *entity.User, verified bool) *UserResponse {
-	part := toUserResponse(user)
-
-	if verified {
-		part.IsVerified = &user.EmailVerified
-	}
-	return part
 }
 
 func toUserResponse(user *entity.User) *UserResponse {

@@ -69,7 +69,12 @@ type DefaultNoteService struct {
 }
 
 func NewNoteService(noteRepo NoteRepository, userRepo UserRepository, s3 storage.S3Client, validate *validator.Validate) *DefaultNoteService {
-	return &DefaultNoteService{NoteRepo: noteRepo, UserRepo: userRepo, S3: s3, Validate: validate}
+	return &DefaultNoteService{
+		NoteRepo: noteRepo,
+		UserRepo: userRepo,
+		S3:       s3,
+		Validate: validate,
+	}
 }
 
 func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorResponse) {
@@ -86,8 +91,8 @@ func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorRespo
 	return resp, nil
 }
 
-func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorResponse) {
-	note, err := n.NoteRepo.FindByID(id)
+func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*NoteResponse, apierror.ErrorResponse) {
+	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
 		return nil, apierror.InternalServerError
@@ -99,14 +104,8 @@ func (n *DefaultNoteService) GetNoteByID(id int) (*NoteResponse, apierror.ErrorR
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateTextNote(req *TextNoteRequest, subId string) (*NoteResponse, apierror.ErrorResponse) {
-	issuer, err := n.UserRepo.FindBySub(subId)
-	if err != nil {
-		log.Errorf("failed to fetch issuer user: %v", err)
-		return nil, apierror.InternalServerError
-	}
-
-	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionCreateNotes) {
+func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *TextNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
+	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
 
@@ -121,7 +120,7 @@ func (n *DefaultNoteService) CreateTextNote(req *TextNoteRequest, subId string) 
 	note := &entity.Note{
 		Name:        req.Name,
 		Content:     req.Content,
-		CreatedByID: issuer.ID,
+		CreatedByID: actor.ID,
 		Tags:        strings.ToLower(tags),
 		NoteType:    entity.NoteType(req.NoteType),
 		ContentSize: len(req.Content),
@@ -130,22 +129,15 @@ func (n *DefaultNoteService) CreateTextNote(req *TextNoteRequest, subId string) 
 		UpdatedAt:   now,
 	}
 
-	if err = n.NoteRepo.Save(note); err != nil {
+	if err := n.NoteRepo.Save(note); err != nil {
 		log.Errorf("failed to save note: %v", err)
 		return nil, apierror.InternalServerError
 	}
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateFileNote(req *NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*NoteResponse, apierror.ErrorResponse) {
-	issuer, err := n.UserRepo.FindBySub(issuerId)
-	if err != nil {
-		log.Errorf("failed to check if user %s is admin: %v", issuerId, err)
-		return nil, apierror.InternalServerError
-	}
-
-	// I don't know how the user can even be nil here, but better safe than sorry?
-	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionCreateNotes) {
+func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *NoteRequest, fileHeader *multipart.FileHeader) (*NoteResponse, apierror.ErrorResponse) {
+	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
 
@@ -168,7 +160,7 @@ func (n *DefaultNoteService) CreateFileNote(req *NoteRequest, fileHeader *multip
 	note := &entity.Note{
 		Name:        req.Name,
 		Content:     filename,
-		CreatedByID: issuer.ID,
+		CreatedByID: actor.ID,
 		Tags:        strings.ToLower(tags),
 		NoteType:    entity.NoteTypeReference,
 		ContentSize: fileLength,
@@ -177,31 +169,24 @@ func (n *DefaultNoteService) CreateFileNote(req *NoteRequest, fileHeader *multip
 		UpdatedAt:   now,
 	}
 
-	err = n.NoteRepo.Save(note)
-	if err != nil {
+	if err := n.NoteRepo.Save(note); err != nil {
 		log.Errorf("failed to create note: %v", err)
 		return nil, apierror.InternalServerError
 	}
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *UpdateNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if valerr := n.Validate.Struct(req); valerr != nil {
 		return nil, apierror.FromValidationError(valerr)
 	}
 
-	user, err := n.UserRepo.FindBySub(userSub)
-	if err != nil {
-		log.Errorf("failed to fetch user: %v", err)
-		return nil, apierror.InternalServerError
-	}
-
-	if user == nil || !user.Permissions.HasEffective(entity.PermissionEditNotes) {
+	if !actor.Permissions.HasEffective(entity.PermissionEditNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
 
-	note, err := n.NoteRepo.FindByID(id)
+	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
 		return nil, apierror.InternalServerError
@@ -232,14 +217,8 @@ func (n *DefaultNoteService) UpdateNote(id int, userSub string, req *UpdateNoteR
 	return toNoteResponse(note, false), nil
 }
 
-func (n *DefaultNoteService) DeleteNote(noteId int, issuerId string) apierror.ErrorResponse {
-	issuer, err := n.UserRepo.FindBySub(issuerId)
-	if err != nil {
-		log.Errorf("failed to check if user %s is admin: %v", issuerId, err)
-		return apierror.InternalServerError
-	}
-
-	if issuer == nil || !issuer.Permissions.HasEffective(entity.PermissionDeleteNotes) {
+func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse {
+	if !actor.Permissions.HasEffective(entity.PermissionDeleteNotes) {
 		return apierror.UserMissingPermsError
 	}
 

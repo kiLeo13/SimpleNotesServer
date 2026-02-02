@@ -59,3 +59,22 @@ func (u *userUpdater) setPermissions(newVal *int64) {
 	u.target.Permissions = newPerms
 	u.dirty = true
 }
+
+func (u *userUpdater) setSuspended(newVal *bool) {
+	if u.err != nil || newVal == nil {
+		return
+	}
+
+	if u.target.Suspended == *newVal {
+		return
+	}
+
+	// Policy Check
+	if err := u.policy.CanPunishUser(u.actor, u.target); err != nil {
+		u.err = err
+		return
+	}
+
+	u.target.Suspended = *newVal
+	u.dirty = true
+}

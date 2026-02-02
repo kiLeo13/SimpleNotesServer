@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -11,9 +12,9 @@ import (
 )
 
 type UserService interface {
-	GetUsers(subId string) ([]*service.UserResponse, apierror.ErrorResponse)
-	GetUser(token, rawId string) (*service.UserResponse, apierror.ErrorResponse)
-	UpdateUser(req *service.UpdateUserRequest, targetId, subId string) (*service.UserResponse, apierror.ErrorResponse)
+	GetUsers(requester *entity.User) ([]*service.UserResponse, apierror.ErrorResponse)
+	GetUser(requester *entity.User, rawId string) (*service.UserResponse, apierror.ErrorResponse)
+	UpdateUser(requester *entity.User, targetId string, req *service.UpdateUserRequest) (*service.UserResponse, apierror.ErrorResponse)
 	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
 	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
@@ -30,49 +31,51 @@ func NewUserDefault(userService UserService) *DefaultUserRoute {
 }
 
 func (u *DefaultUserRoute) GetUsers(c echo.Context) error {
-	token, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
 	}
 
-	users, apierr := u.UserService.GetUsers(token.Sub)
+	users, apierr := u.UserService.GetUsers(user)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
 
-	resp := echo.Map{
-		"users": users,
-	}
+	resp := echo.Map{"users": users}
 	return c.JSON(http.StatusOK, &resp)
 }
 
 func (u *DefaultUserRoute) GetUser(c echo.Context) error {
-	rawId := strings.TrimSpace(c.Param("id"))
-	token := c.Request().Header.Get("Authorization")
-	if rawId == "" {
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
+	targetId := strings.TrimSpace(c.Param("id"))
+	if targetId == "" {
 		return c.JSON(http.StatusBadRequest, apierror.NewMissingParamError("id"))
 	}
 
-	user, apierr := u.UserService.GetUser(token, rawId)
+	resp, apierr := u.UserService.GetUser(user, targetId)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
-	return c.JSON(http.StatusOK, user)
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (u *DefaultUserRoute) UpdateUser(c echo.Context) error {
-	rawId := strings.TrimSpace(c.Param("id"))
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
+	targetId := strings.TrimSpace(c.Param("id"))
 	var req service.UpdateUserRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	token, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(http.StatusUnauthorized, apierror.InvalidAuthTokenError)
-	}
-
-	newUser, apierr := u.UserService.UpdateUser(&req, rawId, token.Sub)
+	newUser, apierr := u.UserService.UpdateUser(user, targetId, &req)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
@@ -90,10 +93,7 @@ func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 		return c.JSON(err.Code(), err)
 	}
 
-	resp := echo.Map{
-		"status": status,
-		"exists": *status == "TAKEN", // Legacy compatibility
-	}
+	resp := echo.Map{"status": status}
 	return c.JSON(http.StatusOK, &resp)
 }
 

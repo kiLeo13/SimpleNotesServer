@@ -2,23 +2,27 @@ package handler
 
 import (
 	"encoding/json"
-	"github.com/labstack/echo/v4"
 	"mime/multipart"
 	"net/http"
+	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
 	"strings"
+
+	"github.com/labstack/echo/v4"
 )
 
+// NoteService interface updated to accept *entity.User instead of strings.
+// This allows the service to check permissions without hitting the DB again.
 type NoteService interface {
 	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
-	GetNoteByID(id int) (*service.NoteResponse, apierror.ErrorResponse)
-	CreateFileNote(req *service.NoteRequest, fileHeader *multipart.FileHeader, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
-	CreateTextNote(req *service.TextNoteRequest, issuerId string) (*service.NoteResponse, apierror.ErrorResponse)
-	UpdateNote(id int, userSub string, req *service.UpdateNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
-	DeleteNote(noteId int, issuerId string) apierror.ErrorResponse
+	GetNoteByID(actor *entity.User, noteId int) (*service.NoteResponse, apierror.ErrorResponse)
+	CreateTextNote(actor *entity.User, req *service.TextNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
+	CreateFileNote(actor *entity.User, req *service.NoteRequest, fileHeader *multipart.FileHeader) (*service.NoteResponse, apierror.ErrorResponse)
+	UpdateNote(actor *entity.User, noteId int, req *service.UpdateNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
+	DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse
 }
 
 type DefaultNoteRoute struct {
@@ -35,21 +39,22 @@ func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
 		return c.JSON(err.Code(), err)
 	}
 
-	resp := echo.Map{
-		"notes": notes,
-	}
+	resp := echo.Map{"notes": notes}
 	return c.JSON(http.StatusOK, &resp)
 }
 
 func (n *DefaultNoteRoute) GetNote(c echo.Context) error {
-	rawId := c.Param("id")
-	id, err := strconv.Atoi(rawId)
-	if err != nil {
-		errResp := apierror.NewSimple(400, "ID is not a number")
-		return c.JSON(errResp.Status, errResp)
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
 	}
 
-	note, apierr := n.NoteService.GetNoteByID(id)
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, apierror.NewInvalidParamTypeError("id", "int"))
+	}
+
+	note, apierr := n.NoteService.GetNoteByID(user, id)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
@@ -72,23 +77,22 @@ func (n *DefaultNoteRoute) CreateNote(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) UpdateNote(c echo.Context) error {
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
-	if err != nil {
-		errResp := apierror.NewSimple(400, "ID is not a number")
-		return c.JSON(errResp.Status, errResp)
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
 	}
+
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, apierror.NewInvalidParamTypeError("id", "int"))
+	}
+
 	var req service.UpdateNoteRequest
 	if err = c.Bind(&req); err != nil {
-		return c.JSON(400, apierror.MalformedBodyError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	token, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
-	}
-
-	newNote, apierr := n.NoteService.UpdateNote(id, token.Sub, &req)
+	newNote, apierr := n.NoteService.UpdateNote(user, id, &req)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
@@ -96,19 +100,17 @@ func (n *DefaultNoteRoute) UpdateNote(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
-	if err != nil {
-		errResp := apierror.NewSimple(400, "ID is not a number")
-		return c.JSON(errResp.Status, errResp)
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
 	}
 
-	data, err := utils.ParseTokenDataCtx(c)
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
+		return c.JSON(http.StatusBadRequest, apierror.NewInvalidParamTypeError("id", "int"))
 	}
 
-	serr := n.NoteService.DeleteNote(id, data.Sub)
+	serr := n.NoteService.DeleteNote(user, id)
 	if serr != nil {
 		return c.JSON(serr.Code(), serr)
 	}
@@ -116,17 +118,17 @@ func (n *DefaultNoteRoute) DeleteNote(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) createFromText(c echo.Context) error {
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
 	var req service.TextNoteRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(400, apierror.MalformedBodyError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	data, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
-	}
-
-	note, apierr := n.NoteService.CreateTextNote(&req, data.Sub)
+	note, apierr := n.NoteService.CreateTextNote(user, &req)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
@@ -134,27 +136,27 @@ func (n *DefaultNoteRoute) createFromText(c echo.Context) error {
 }
 
 func (n *DefaultNoteRoute) createFromFile(c echo.Context) error {
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
 	jsonPayload := strings.TrimSpace(c.FormValue("json_payload"))
 	if jsonPayload == "" {
-		return c.JSON(400, apierror.FormJSONRequiredError)
+		return c.JSON(http.StatusBadRequest, apierror.FormJSONRequiredError)
 	}
 
 	var req service.NoteRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
-		return c.JSON(400, apierror.MalformedBodyError)
-	}
-
-	data, err := utils.ParseTokenDataCtx(c)
-	if err != nil {
-		return c.JSON(401, apierror.InvalidAuthTokenError)
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
 	fileHeader, err := c.FormFile("content")
 	if err != nil {
-		return c.JSON(400, apierror.MissingNoteFileError)
+		return c.JSON(http.StatusBadRequest, apierror.MissingNoteFileError)
 	}
 
-	note, apierr := n.NoteService.CreateFileNote(&req, fileHeader, data.Sub)
+	note, apierr := n.NoteService.CreateFileNote(user, &req, fileHeader)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}
