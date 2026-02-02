@@ -6,7 +6,8 @@ import (
 	"simplenotes/cmd/internal/domain/policy"
 	"simplenotes/cmd/internal/domain/sqlite"
 	"simplenotes/cmd/internal/domain/sqlite/repository"
-	handler2 "simplenotes/cmd/internal/http/handler"
+	"simplenotes/cmd/internal/http/handler"
+	mdlware "simplenotes/cmd/internal/http/middleware"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/service"
@@ -28,77 +29,97 @@ func main() {
 	validate := validator.New()
 	registerValidators(validate)
 
-	// Loads env vars depending on environment
 	if os.Getenv("GO_ENV") == "production" {
-		loadProdEnv() // AWS SSM Parameter Store
+		loadProdEnv()
 	} else {
-		// Loads from .env
-		err := godotenv.Load()
-		if err != nil {
+		if err := godotenv.Load(); err != nil {
 			panic(err)
 		}
 	}
 
-	// Init SQLite
+	// Infra Init
 	db, err := sqlite.Init()
 	if err != nil {
 		panic(err)
 	}
 
-	// Init cognito client
 	cogClient, err := cognitoclient.InitCognitoClient()
 	if err != nil {
 		panic(err)
 	}
 
-	// Init S3 client
 	s3Client, err := storage.NewStorageClient()
 	if err != nil {
 		panic(err)
 	}
 
-	// Policies
+	// Domain & Service Wiring
 	userPolicy := policy.NewUserPolicy()
 
-	// Gettings repos
 	noteRepo := repository.NewNoteRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
-	// Getting services
 	userService := service.NewUserService(userRepo, validate, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
 
-	// Gettings handler
-	noteRoutes := handler2.NewNoteDefault(noteService)
-	userRoutes := handler2.NewUserDefault(userService)
+	noteRoutes := handler.NewNoteDefault(noteService)
+	userRoutes := handler.NewUserDefault(userService)
 
+	// Middleware Setup
+	authMiddleware := mdlware.NewAuthMiddleware(&mdlware.AuthMiddlewareConfig{
+		UserRepo: userRepo,
+	})
+
+	// Server Setup
 	e := echo.New()
+
+	// Global Middlewares
 	e.Use(middleware.CORS())
 	e.Use(middleware.BodyLimit("30M"))
+	e.Use(middleware.Recover())
 
-	// Notes
-	e.GET("/api/notes", noteRoutes.GetNotes)
-	e.GET("/api/notes/:id", noteRoutes.GetNote)
-	e.POST("/api/notes", noteRoutes.CreateNote)
-	e.PATCH("/api/notes/:id", noteRoutes.UpdateNote)
-	e.DELETE("/api/notes/:id", noteRoutes.DeleteNote)
-
-	// Users
-	e.POST("/api/users/check-email", userRoutes.CheckEmail)
-	e.GET("/api/users", userRoutes.GetUsers)
-	e.GET("/api/users/:id", userRoutes.GetUser)
-	e.PATCH("/api/users/:id", userRoutes.UpdateUser)
-	e.POST("/api/users", userRoutes.CreateUser)
-	e.POST("/api/users/login", userRoutes.CreateLogin)
-	e.POST("/api/users/confirms", userRoutes.ConfirmSignup)
-	e.POST("/api/users/confirms/resend", userRoutes.ResendConfirmation)
-
-	// Docker Compose healthcheck
-	e.GET("/health", healthCheckRoute)
+	// Register Routes
+	registerRoutes(e, noteRoutes, userRoutes, authMiddleware)
 
 	if err := e.Start(":7070"); err != nil {
 		panic(err)
 	}
+}
+
+// registerRoutes separates the routing logic from the wiring logic.
+func registerRoutes(
+	e *echo.Echo,
+	noteH *handler.DefaultNoteRoute,
+	userH *handler.DefaultUserRoute,
+	authMiddleware echo.MiddlewareFunc,
+) {
+	// --- Public Routes (Unauthenticated) ---
+	public := e.Group("/api")
+
+	e.GET("/health", healthCheckRoute)
+
+	// User Auth & Registration
+	public.POST("/users/login", userH.CreateLogin)
+	public.POST("/users", userH.CreateUser) // Registration is public
+	public.POST("/users/check-email", userH.CheckEmail)
+	public.POST("/users/confirms", userH.ConfirmSignup)
+	public.POST("/users/confirms/resend", userH.ResendConfirmation)
+
+	// --- Protected Routes ---
+	protected := e.Group("/api")
+	protected.Use(authMiddleware)
+
+	// Notes
+	protected.GET("/notes", noteH.GetNotes)
+	protected.GET("/notes/:id", noteH.GetNote)
+	protected.POST("/notes", noteH.CreateNote)
+	protected.PATCH("/notes/:id", noteH.UpdateNote)
+	protected.DELETE("/notes/:id", noteH.DeleteNote)
+
+	// Users (Management)
+	protected.GET("/users", userH.GetUsers)
+	protected.GET("/users/:id", userH.GetUser)
+	protected.PATCH("/users/:id", userH.UpdateUser)
 }
 
 func registerValidators(validate *validator.Validate) {
@@ -128,13 +149,11 @@ func loadProdEnv() {
 	}
 
 	prefixLength := len(envVarsPrefix)
-	// Export vars
 	for _, param := range out.Parameters {
 		key := (*param.Name)[prefixLength:]
 		value := *param.Value
-		enverr := os.Setenv(key, value)
-		if enverr != nil {
-			log.Fatalf("unable to set environment variable, %v", enverr)
+		if err := os.Setenv(key, value); err != nil {
+			log.Fatalf("unable to set environment variable, %v", err)
 		}
 	}
 	log.Debugf("loaded %d prod environment variables", len(out.Parameters))
