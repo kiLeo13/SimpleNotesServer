@@ -85,11 +85,11 @@ func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID 
 	}
 }
 
-func (s *WebSocketService) Dispatch(ctx context.Context, e events.WebSocketEvent) {
+func (s *WebSocketService) Dispatch(ctx context.Context, e *events.WebSocketEvent) {
 	s.PushToUser(ctx, e.UserID, e)
 }
 
-func (s *WebSocketService) Broadcast(ctx context.Context, e events.WebSocketEvent) {
+func (s *WebSocketService) Broadcast(ctx context.Context, e *events.WebSocketEvent) {
 	conns, err := s.ConnRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch all connections: %v", err)
