@@ -10,6 +10,7 @@ import (
 	mdlware "simplenotes/cmd/internal/http/middleware"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
+	"simplenotes/cmd/internal/infrastructure/aws/websocket"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils/validators"
 
@@ -53,15 +54,24 @@ func main() {
 		panic(err)
 	}
 
+	wsEndpoint := os.Getenv("AWS_WS_GATEWAY_ENDPOINT")
+	wsClient, err := websocket.NewAWSGatewayClient(context.Background(), wsEndpoint)
+	if err != nil {
+		panic(err)
+	}
+
 	// Domain & Service Wiring
 	userPolicy := policy.NewUserPolicy()
 
+	connRepo := repository.NewConnectionRepository(db)
 	noteRepo := repository.NewNoteRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
+	connService := service.NewWebSocketService(connRepo, wsClient)
 	userService := service.NewUserService(userRepo, validate, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
 
+	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)
 	userRoutes := handler.NewUserDefault(userService)
 
@@ -79,7 +89,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// Register Routes
-	registerRoutes(e, noteRoutes, userRoutes, authMiddleware)
+	registerRoutes(e, noteRoutes, userRoutes, connRoutes, authMiddleware)
 
 	if err := e.Start(":7070"); err != nil {
 		panic(err)
@@ -91,6 +101,7 @@ func registerRoutes(
 	e *echo.Echo,
 	noteH *handler.DefaultNoteRoute,
 	userH *handler.DefaultUserRoute,
+	wsH *handler.DefaultWSRoute,
 	authMiddleware echo.MiddlewareFunc,
 ) {
 	// --- Public Routes (Unauthenticated) ---
@@ -116,11 +127,17 @@ func registerRoutes(
 	protected.PATCH("/notes/:id", noteH.UpdateNote)
 	protected.DELETE("/notes/:id", noteH.DeleteNote)
 
-	// Users (Management)
+	// Users
 	protected.GET("/users", userH.GetUsers)
 	protected.GET("/users/:id", userH.GetUser)
 	protected.PATCH("/users/:id", userH.UpdateUser)
 	protected.DELETE("/users/:id", userH.DeleteUser)
+
+	// --- WebSocket ---
+	ws := e.Group("/ws")
+
+	ws.POST("/connect", wsH.HandleConnect, authMiddleware)
+	ws.POST("/disconnect", wsH.HandleDisconnect)
 }
 
 func registerValidators(validate *validator.Validate) {
