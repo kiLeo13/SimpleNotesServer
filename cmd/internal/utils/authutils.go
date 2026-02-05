@@ -18,6 +18,8 @@ type TokenData struct {
 	// Email the user's Email.
 	// This value will be empty if the provided token is an Access Token, for instance.
 	Email string
+
+	Exp int64
 }
 
 func ParseTokenData(token string) (*TokenData, error) {
@@ -34,6 +36,7 @@ func ParseTokenData(token string) (*TokenData, error) {
 	return &TokenData{
 		Sub:   getValue(claims, "sub"),
 		Email: getValue(claims, "email"),
+		Exp:   getInt64(claims, "exp"),
 	}, nil
 }
 
@@ -73,4 +76,20 @@ func getValue(claims jwt.MapClaims, key string) string {
 		return ""
 	}
 	return claim
+}
+
+func getInt64(claims jwt.MapClaims, key string) int64 {
+	val, ok := claims[key]
+	if !ok {
+		return 0
+	}
+
+	if f, ok := val.(float64); ok {
+		return int64(f)
+	}
+
+	if i, ok := val.(int64); ok {
+		return i
+	}
+	return 0
 }

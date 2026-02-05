@@ -2,6 +2,14 @@ package events
 
 import "simplenotes/cmd/internal/service"
 
+type ConnectionKillEvent struct {
+	Reason string `json:"reason"`
+}
+
+func (e *ConnectionKillEvent) GetType() EventType {
+	return EventConnectionKill
+}
+
 // CreateNoteEvent holds a whole note response body.
 type CreateNoteEvent struct {
 	*service.NoteResponse
