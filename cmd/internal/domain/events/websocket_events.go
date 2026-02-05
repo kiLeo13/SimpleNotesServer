@@ -5,8 +5,9 @@ type EventType string
 const (
 	EventConnectionKill EventType = "CONNECTION_KILL"
 
-	EventUserUpdate EventType = "USER_UPDATE"
+	EventNoteCreate EventType = "NOTE_CREATE"
 	EventNoteUpdate EventType = "NOTE_UPDATE"
+	EventNoteDelete EventType = "NOTE_DELETE"
 )
 
 type WebSocketEvent struct {

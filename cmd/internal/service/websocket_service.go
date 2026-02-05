@@ -85,18 +85,29 @@ func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID 
 	}
 }
 
-func (s *WebSocketService) Dispatch(ctx context.Context, e *events.WebSocketEvent) {
-	s.PushToUser(ctx, e.UserID, e)
+func (s *WebSocketService) Dispatch(ctx context.Context, userID int, evt events.SocketEvent) {
+	envelope := &events.WebSocketEvent{
+		Type: evt.GetType(),
+		Data: evt,
+	}
+	s.PushToUser(ctx, userID, envelope)
 }
 
-func (s *WebSocketService) Broadcast(ctx context.Context, e *events.WebSocketEvent) {
+// Broadcast sends an event to ALL connected users.
+// This iterates through every active connection in the DB.
+func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent) {
 	conns, err := s.ConnRepo.FindAll()
 	if err != nil {
-		log.Errorf("failed to fetch all connections: %v", err)
+		log.Errorf("failed to fetch all connections for broadcast: %v", err)
 		return
 	}
 
+	envelope := &events.WebSocketEvent{
+		Type: evt.GetType(),
+		Data: evt,
+	}
+
 	for _, connID := range conns {
-		_ = s.Gateway.PostToConnection(ctx, connID, e)
+		_ = s.Gateway.PostToConnection(ctx, connID, envelope)
 	}
 }
