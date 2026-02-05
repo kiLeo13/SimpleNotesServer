@@ -69,7 +69,7 @@ func main() {
 
 	connService := service.NewWebSocketService(connRepo, wsClient)
 	userService := service.NewUserService(userRepo, validate, cogClient, userPolicy)
-	noteService := service.NewNoteService(noteRepo, userRepo, s3Client, validate)
+	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate)
 
 	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)

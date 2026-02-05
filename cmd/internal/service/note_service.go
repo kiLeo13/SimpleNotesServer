@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -11,6 +12,7 @@ import (
 	"mime/multipart"
 	"path/filepath"
 	"simplenotes/cmd/internal/domain/entity"
+	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -62,18 +64,26 @@ type NoteRepository interface {
 }
 
 type DefaultNoteService struct {
-	NoteRepo NoteRepository
-	UserRepo UserRepository
-	S3       storage.S3Client
-	Validate *validator.Validate
+	NoteRepo  NoteRepository
+	UserRepo  UserRepository
+	WSService *WebSocketService
+	S3        storage.S3Client
+	Validate  *validator.Validate
 }
 
-func NewNoteService(noteRepo NoteRepository, userRepo UserRepository, s3 storage.S3Client, validate *validator.Validate) *DefaultNoteService {
+func NewNoteService(
+	noteRepo NoteRepository,
+	userRepo UserRepository,
+	wsService *WebSocketService,
+	s3 storage.S3Client,
+	validate *validator.Validate,
+) *DefaultNoteService {
 	return &DefaultNoteService{
-		NoteRepo: noteRepo,
-		UserRepo: userRepo,
-		S3:       s3,
-		Validate: validate,
+		NoteRepo:  noteRepo,
+		UserRepo:  userRepo,
+		WSService: wsService,
+		S3:        s3,
+		Validate:  validate,
 	}
 }
 
@@ -133,6 +143,10 @@ func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *TextNoteReq
 		log.Errorf("failed to save note: %v", err)
 		return nil, apierror.InternalServerError
 	}
+
+	// I cannot reuse the same response since gateway events should not include the
+	// `content` if it's not a REFERENCE type (the payload gets too big ^^).
+	go n.dispatchNoteCreateEvent(toNoteResponse(note, false))
 	return toNoteResponse(note, true), nil
 }
 
@@ -173,7 +187,10 @@ func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *NoteRequest
 		log.Errorf("failed to create note: %v", err)
 		return nil, apierror.InternalServerError
 	}
-	return toNoteResponse(note, true), nil
+
+	resp := toNoteResponse(note, true)
+	go n.dispatchNoteCreateEvent(resp)
+	return resp, nil
 }
 
 func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *UpdateNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
@@ -214,7 +231,10 @@ func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *Upd
 		log.Errorf("failed to update note: %v", err)
 		return nil, apierror.InternalServerError
 	}
-	return toNoteResponse(note, false), nil
+
+	resp := toNoteResponse(note, false)
+	go n.dispatchNoteUpdateEvent(resp)
+	return resp, nil
 }
 
 func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse {
@@ -243,14 +263,31 @@ func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror
 		log.Errorf("failed to delete note: %v", err)
 		return apierror.InternalServerError
 	}
+
+	go n.dispatchNoteDeleteEvent(note.ID)
 	return nil
 }
 
-// handleNoteUpload tries to upload the note to S3.
-// EXCEPT if the file is a text file, which in such cases this method
-// will return immediately with the content of the text file.
-//
-// If the file IS NOT a text file, it uploads to the S3 bucket and returns the filename.
+func (n *DefaultNoteService) dispatchNoteCreateEvent(note *NoteResponse) {
+	n.WSService.Broadcast(context.Background(), &events.CreateNoteEvent{
+		NoteResponse: note,
+	})
+}
+
+func (n *DefaultNoteService) dispatchNoteUpdateEvent(note *NoteResponse) {
+	n.WSService.Broadcast(context.Background(), &events.UpdateNoteEvent{
+		NoteResponse: note,
+	})
+}
+
+func (n *DefaultNoteService) dispatchNoteDeleteEvent(noteID int) {
+	n.WSService.Broadcast(context.Background(), &events.DeleteNoteEvent{
+		NoteID: noteID,
+	})
+}
+
+// handleNoteUpload tries to upload the note to S3 and already generates the
+// new UUID name of the file object that will persist.
 func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (string, int, apierror.ErrorResponse) {
 	ext := filepath.Ext(fileheader.Filename)
 	bytes, apierr := readNoteFile(fileheader)
