@@ -17,8 +17,12 @@ func (c *DefaultConnectionRepository) Save(user *entity.Connection) error {
 	return c.db.Save(user).Error
 }
 
-func (c *DefaultConnectionRepository) Delete(note *entity.Connection) error {
-	return c.db.Delete(note).Error
+func (c *DefaultConnectionRepository) Delete(connID string) error {
+	result := c.db.
+		Where("connection_id = ?", connID).
+		Delete(&entity.Connection{})
+
+	return result.Error
 }
 
 func (c *DefaultConnectionRepository) FindByUserID(userID int) ([]string, error) {
