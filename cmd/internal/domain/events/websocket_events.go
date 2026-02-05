@@ -4,6 +4,7 @@ type EventType string
 
 const (
 	EventConnectionKill EventType = "CONNECTION_KILL"
+	EventSessionExpired EventType = "SESSION_EXPIRED"
 
 	EventNoteCreate EventType = "NOTE_CREATE"
 	EventNoteUpdate EventType = "NOTE_UPDATE"

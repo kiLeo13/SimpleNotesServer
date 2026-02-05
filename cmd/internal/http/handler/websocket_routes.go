@@ -28,8 +28,13 @@ func (h *DefaultWSRoute) HandleConnect(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, apierror.NewMissingParamError("connectionId"))
 	}
 
-	if err := h.WSService.RegisterConnection(user.ID, connID); err != nil {
-		return c.JSON(err.Code(), err)
+	token, err := utils.ParseTokenDataCtx(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, apierror.InvalidAuthTokenError)
+	}
+
+	if apierr := h.WSService.RegisterConnection(user.ID, connID, token.Exp); apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
 	}
 	return c.NoContent(http.StatusOK)
 }

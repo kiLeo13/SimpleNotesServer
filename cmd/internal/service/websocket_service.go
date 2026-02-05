@@ -17,6 +17,7 @@ type ConnectionRepository interface {
 	Delete(connID string) error
 	FindByUserID(userID int) ([]string, error)
 	FindAll() ([]string, error)
+	FindExpired(now int64) ([]*entity.Connection, error)
 }
 
 type WebSocketService struct {
@@ -31,10 +32,11 @@ func NewWebSocketService(repo ConnectionRepository, gateway websocket.GatewayCli
 	}
 }
 
-func (s *WebSocketService) RegisterConnection(userID int, connectionID string) apierror.ErrorResponse {
+func (s *WebSocketService) RegisterConnection(userID int, connectionID string, exp int64) apierror.ErrorResponse {
 	conn := &entity.Connection{
 		ConnectionID: connectionID,
 		UserID:       userID,
+		ExpiresAt:    exp,
 		CreatedAt:    utils.NowUTC(),
 	}
 
