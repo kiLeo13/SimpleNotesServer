@@ -12,6 +12,7 @@ import (
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
 	"simplenotes/cmd/internal/service"
+	"simplenotes/cmd/internal/service/jobs"
 	"simplenotes/cmd/internal/utils/validators"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -75,20 +76,27 @@ func main() {
 	noteRoutes := handler.NewNoteDefault(noteService)
 	userRoutes := handler.NewUserDefault(userService)
 
-	// Middleware Setup
+	// --- Background Jobs ---
+	cleaner := jobs.NewConnectionCleaner(connService)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go cleaner.Start(ctx)
+
+	// --- Middleware Setup ---
 	authMiddleware := mdlware.NewAuthMiddleware(&mdlware.AuthMiddlewareConfig{
 		UserRepo: userRepo,
 	})
 
-	// Server Setup
+	// --- Server Setup ---
 	e := echo.New()
 
-	// Global Middlewares
 	e.Use(middleware.CORS())
 	e.Use(middleware.BodyLimit("30M"))
 	e.Use(middleware.Recover())
 
-	// Register Routes
+	// --- Register Routes ---
 	registerRoutes(e, noteRoutes, userRoutes, connRoutes, authMiddleware)
 
 	if err := e.Start(":7070"); err != nil {

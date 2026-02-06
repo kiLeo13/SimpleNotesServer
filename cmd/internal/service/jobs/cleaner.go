@@ -49,11 +49,8 @@ func (c *ConnectionCleaner) cleanup() {
 
 	log.Infof("Cleaner: Found %d expired connections. Terminating...", len(conns))
 
-	msg := events.WebSocketEvent{
-		Type: events.EventConnectionKill,
-		Data: map[string]interface{}{
-			"reason": "Session Expired",
-		},
+	envelope := events.Wrapper{
+		Type: events.TypeSessionExpired,
 	}
 
 	for _, conn := range conns {
@@ -61,7 +58,7 @@ func (c *ConnectionCleaner) cleanup() {
 		bgCtx := context.Background()
 
 		// Notify Client (So they know NOT to try reconnecting)
-		_ = c.wsService.Gateway.PostToConnection(bgCtx, conn.ConnectionID, msg)
+		_ = c.wsService.Gateway.PostToConnection(bgCtx, conn.ConnectionID, envelope)
 
 		// Tell AWS we are dropping the connection
 		_ = c.wsService.Gateway.DeleteConnection(bgCtx, conn.ConnectionID)
