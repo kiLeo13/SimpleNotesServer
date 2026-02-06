@@ -1,6 +1,7 @@
 package service
 
 import (
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/policy"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
@@ -12,17 +13,6 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-type EmailStatus string
-
-const (
-	// EmailStatusAvailable indicates that the email is available for registration.
-	EmailStatusAvailable EmailStatus = "AVAILABLE"
-	// EmailStatusExists indicates that the email is already in use by some user.
-	EmailStatusExists EmailStatus = "TAKEN"
-	// EmailStatusVerifying indicates that the email is in the process of verification.
-	EmailStatusVerifying EmailStatus = "VERIFYING"
-)
-
 type UserRepository interface {
 	FindAllActive() ([]*entity.User, error)
 	FindActiveBySub(sub string) (*entity.User, error)
@@ -32,51 +22,6 @@ type UserRepository interface {
 	SoftDelete(user *entity.User) error
 	ExistsActiveByEmail(email string) (bool, error)
 	Save(user *entity.User) error
-}
-
-type CreateUserRequest struct {
-	Username string `json:"username" validate:"required,min=2,max=80"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,max=64,hasspecial,hasdigit,hasupper,haslower"`
-}
-
-type UserLoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,max=64"`
-}
-
-type UpdateUserRequest struct {
-	Username  *string `json:"username" validate:"omitempty,min=2,max=80"`
-	Perms     *int64  `json:"permissions" validate:"omitempty,min=0"`
-	Suspended *bool   `json:"suspended" validate:"omitempty"`
-}
-
-type ConfirmSignupRequest struct {
-	Email string `json:"email" validate:"required,email"`
-	Code  string `json:"code" validate:"required,min=1,max=8"`
-}
-
-type ResendConfirmRequest struct {
-	Email string `json:"email" validate:"required,email"`
-}
-
-type UserStatusRequest struct {
-	Email string `json:"email" validate:"required,email"`
-}
-
-type UserResponse struct {
-	ID         int    `json:"id"`
-	Username   string `json:"username"`
-	Perms      int64  `json:"permissions"`
-	IsVerified *bool  `json:"is_verified,omitempty"` // Req (Manage Users)
-	Suspended  *bool  `json:"suspended,omitempty"`   // Req (Manage Users | Punish Users)
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
-}
-
-type UserLoginResponse struct {
-	AccessToken string `json:"access_token"`
-	IDToken     string `json:"id_token"`
 }
 
 type UserService struct {
@@ -95,20 +40,20 @@ func NewUserService(userRepo UserRepository, validate *validator.Validate, cogCl
 	}
 }
 
-func (u *UserService) GetUsers(actor *entity.User) ([]*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) GetUsers(actor *entity.User) ([]*contract.UserResponse, apierror.ErrorResponse) {
 	users, err := u.UserRepo.FindAllActive()
 	if err != nil {
 		return nil, nil
 	}
 
-	resp := make([]*UserResponse, len(users))
+	resp := make([]*contract.UserResponse, len(users))
 	for i, user := range users {
 		resp[i] = toUserResponse(user, actor)
 	}
 	return resp, nil
 }
 
-func (u *UserService) GetUser(actor *entity.User, rawId string) (*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) GetUser(actor *entity.User, rawId string) (*contract.UserResponse, apierror.ErrorResponse) {
 	user, apierr := u.fetchUser(actor, rawId, true)
 	if apierr != nil {
 		return nil, apierr
@@ -122,7 +67,7 @@ func (u *UserService) GetUser(actor *entity.User, rawId string) (*UserResponse, 
 	return resp, nil
 }
 
-func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *UpdateUserRequest) (*UserResponse, apierror.ErrorResponse) {
+func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contract.UpdateUserRequest) (*contract.UserResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
@@ -179,13 +124,13 @@ func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierro
 	return nil
 }
 
-func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror.ErrorResponse) {
+func (u *UserService) CheckEmail(req *contract.UserStatusRequest) (*contract.EmailStatus, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
 	}
 
-	var status EmailStatus
+	var status contract.EmailStatus
 	user, err := u.UserRepo.FindActiveByEmail(req.Email)
 	if err != nil {
 		log.Errorf("failed to check if user (%s) exists: %v", req.Email, err)
@@ -194,18 +139,18 @@ func (u *UserService) CheckEmail(req *UserStatusRequest) (*EmailStatus, apierror
 
 	switch {
 	case user == nil:
-		status = EmailStatusAvailable
+		status = contract.EmailStatusAvailable
 	case !user.EmailVerified:
-		status = EmailStatusVerifying
+		status = contract.EmailStatusVerifying
 	default:
-		status = EmailStatusExists
+		status = contract.EmailStatusExists
 	}
 	return &status, nil
 }
 
 // CreateUser creates a new user on Cognito (as well as in our database),
 // and sends a verification code to the user's email address.
-func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse {
+func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.ErrorResponse {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return apierror.FromValidationError(err)
@@ -249,7 +194,7 @@ func (u *UserService) CreateUser(req *CreateUserRequest) apierror.ErrorResponse 
 	return nil
 }
 
-func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror.ErrorResponse) {
+func (u *UserService) Login(req *contract.UserLoginRequest) (*contract.UserLoginResponse, apierror.ErrorResponse) {
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)
 	}
@@ -277,10 +222,13 @@ func (u *UserService) Login(req *UserLoginRequest) (*UserLoginResponse, apierror
 	if apierr != nil {
 		return nil, apierr
 	}
-	return &UserLoginResponse{AccessToken: auth.AccessToken, IDToken: auth.IDToken}, nil
+	return &contract.UserLoginResponse{
+		AccessToken: auth.AccessToken,
+		IDToken:     auth.IDToken,
+	}, nil
 }
 
-func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) apierror.ErrorResponse {
+func (u *UserService) ConfirmSignup(req *contract.ConfirmSignupRequest) apierror.ErrorResponse {
 	if err := u.Validate.Struct(req); err != nil {
 		return apierror.FromValidationError(err)
 	}
@@ -319,7 +267,7 @@ func (u *UserService) ConfirmSignup(req *ConfirmSignupRequest) apierror.ErrorRes
 	return nil
 }
 
-func (u *UserService) ResendConfirmation(req *ResendConfirmRequest) apierror.ErrorResponse {
+func (u *UserService) ResendConfirmation(req *contract.ResendConfirmRequest) apierror.ErrorResponse {
 	if err := u.Validate.Struct(req); err != nil {
 		return apierror.FromValidationError(err)
 	}
@@ -429,12 +377,12 @@ func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string)
 	return nil
 }
 
-func toUserResponse(user, requester *entity.User) *UserResponse {
+func toUserResponse(user, requester *entity.User) *contract.UserResponse {
 	if !user.Active {
 		return toDeletedUserResponse(user)
 	}
 
-	resp := &UserResponse{
+	resp := &contract.UserResponse{
 		ID:        user.ID,
 		Username:  user.Username,
 		Perms:     int64(user.Permissions),
@@ -454,8 +402,8 @@ func toUserResponse(user, requester *entity.User) *UserResponse {
 	return resp
 }
 
-func toDeletedUserResponse(user *entity.User) *UserResponse {
-	return &UserResponse{
+func toDeletedUserResponse(user *entity.User) *contract.UserResponse {
+	return &contract.UserResponse{
 		ID:        user.ID,
 		Username:  "Deleted User",
 		Perms:     0,

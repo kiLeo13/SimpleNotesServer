@@ -11,6 +11,7 @@ import (
 	"io"
 	"mime/multipart"
 	"path/filepath"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
@@ -18,43 +19,6 @@ import (
 	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
 )
-
-const MaxNoteFileSizeBytes = 30 * 1024 * 1024
-
-var ValidNoteFileTypes = []string{"pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
-
-type NoteResponse struct {
-	ID          int      `json:"id"`
-	Name        string   `json:"name"`
-	Content     string   `json:"content,omitempty"`
-	Tags        []string `json:"tags"`
-	Visibility  string   `json:"visibility"`
-	NoteType    string   `json:"note_type"`
-	ContentSize int      `json:"content_size"`
-	CreatedByID int      `json:"created_by_id"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
-}
-
-type NoteRequest struct {
-	Name       string   `json:"name" validate:"required,min=2,max=80"`
-	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
-	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
-}
-
-type TextNoteRequest struct {
-	Name       string   `json:"name" validate:"required,min=2,max=80"`
-	Content    string   `json:"content" validate:"required,max=1000000"`
-	NoteType   string   `json:"note_type" validate:"required,oneof=MARKDOWN FLOWCHART"`
-	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
-	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
-}
-
-type UpdateNoteRequest struct {
-	Name       *string  `form:"name" validate:"omitempty,min=2,max=80"`
-	Visibility *string  `form:"visibility" validate:"omitempty,oneof=PUBLIC CONFIDENTIAL"`
-	Tags       []string `form:"tags" validate:"omitempty,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
-}
 
 type NoteRepository interface {
 	FindAll() ([]*entity.Note, error)
@@ -87,21 +51,21 @@ func NewNoteService(
 	}
 }
 
-func (n *DefaultNoteService) GetAllNotes() ([]*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse) {
 	notes, err := n.NoteRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
 		return nil, apierror.InternalServerError
 	}
 
-	resp := make([]*NoteResponse, len(notes))
+	resp := make([]*contract.NoteResponse, len(notes))
 	for i, note := range notes {
 		resp[i] = toNoteResponse(note, false)
 	}
 	return resp, nil
 }
 
-func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*contract.NoteResponse, apierror.ErrorResponse) {
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
@@ -114,7 +78,7 @@ func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*NoteR
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *TextNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
 	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
@@ -150,7 +114,7 @@ func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *TextNoteReq
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *NoteRequest, fileHeader *multipart.FileHeader) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *contract.NoteRequest, fileHeader *multipart.FileHeader) (*contract.NoteResponse, apierror.ErrorResponse) {
 	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
@@ -193,7 +157,7 @@ func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *NoteRequest
 	return resp, nil
 }
 
-func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *UpdateNoteRequest) (*NoteResponse, apierror.ErrorResponse) {
+func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if valerr := n.Validate.Struct(req); valerr != nil {
 		return nil, apierror.FromValidationError(valerr)
@@ -268,13 +232,13 @@ func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror
 	return nil
 }
 
-func (n *DefaultNoteService) dispatchNoteCreateEvent(note *NoteResponse) {
+func (n *DefaultNoteService) dispatchNoteCreateEvent(note *contract.NoteResponse) {
 	n.WSService.Broadcast(context.Background(), &events.CreateNoteEvent{
 		NoteResponse: note,
 	})
 }
 
-func (n *DefaultNoteService) dispatchNoteUpdateEvent(note *NoteResponse) {
+func (n *DefaultNoteService) dispatchNoteUpdateEvent(note *contract.NoteResponse) {
 	n.WSService.Broadcast(context.Background(), &events.UpdateNoteEvent{
 		NoteResponse: note,
 	})
@@ -305,15 +269,15 @@ func handleNoteUpload(s3 storage.S3Client, fileheader *multipart.FileHeader) (st
 }
 
 func checkNoteFile(fileHeader *multipart.FileHeader) apierror.ErrorResponse {
-	if fileHeader.Size > MaxNoteFileSizeBytes {
-		return apierror.NewNoteContentTooLargeError(MaxNoteFileSizeBytes)
+	if fileHeader.Size > contract.MaxNoteFileSizeBytes {
+		return apierror.NewNoteContentTooLargeError(contract.MaxNoteFileSizeBytes)
 	}
 
 	if strings.TrimSpace(fileHeader.Filename) == "" {
 		return apierror.MissingFileNameError
 	}
 
-	if ext, ok := utils.CheckFileExt(fileHeader.Filename, ValidNoteFileTypes); !ok {
+	if ext, ok := utils.CheckFileExt(fileHeader.Filename, contract.ValidNoteFileTypes); !ok {
 		return apierror.NewInvalidFileExtError(ext)
 	}
 	return nil
@@ -335,13 +299,13 @@ func readNoteFile(fileHeader *multipart.FileHeader) ([]byte, apierror.ErrorRespo
 	return bytes, nil
 }
 
-func toNoteResponse(note *entity.Note, forceContent bool) *NoteResponse {
+func toNoteResponse(note *entity.Note, forceContent bool) *contract.NoteResponse {
 	var content string
 	if note.NoteType == entity.NoteTypeReference || forceContent {
 		content = note.Content
 	}
 
-	return &NoteResponse{
+	return &contract.NoteResponse{
 		ID:          note.ID,
 		Name:        note.Name,
 		Content:     content,
