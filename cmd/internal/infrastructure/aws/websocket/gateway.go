@@ -18,7 +18,7 @@ type AWSGatewayClient struct {
 	client *apigatewaymanagementapi.Client
 }
 
-func NewAWSGatewayClient(ctx context.Context, endpoint string) (*AWSGatewayClient, error) {
+func NewAWSGatewayClient(ctx context.Context, endpoint, region string) (*AWSGatewayClient, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -26,6 +26,7 @@ func NewAWSGatewayClient(ctx context.Context, endpoint string) (*AWSGatewayClien
 
 	client := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
 		o.BaseEndpoint = aws.String(endpoint)
+		o.Region = region
 	})
 	return &AWSGatewayClient{client: client}, nil
 }

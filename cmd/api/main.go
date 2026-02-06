@@ -56,7 +56,8 @@ func main() {
 	}
 
 	wsEndpoint := os.Getenv("AWS_WS_GATEWAY_ENDPOINT")
-	wsClient, err := websocket.NewAWSGatewayClient(context.Background(), wsEndpoint)
+	wsRegion := os.Getenv("AWS_WS_GATEWAY_REGION")
+	wsClient, err := websocket.NewAWSGatewayClient(context.Background(), wsEndpoint, wsRegion)
 	if err != nil {
 		panic(err)
 	}
