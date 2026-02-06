@@ -69,10 +69,10 @@ func (s *WebSocketService) PushToUser(ctx context.Context, userID int, payload i
 func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int, reason string) {
 	conns, _ := s.ConnRepo.FindByUserID(userID)
 
-	msg := events.WebSocketEvent{
-		Type: events.EventConnectionKill,
-		Data: map[string]interface{}{
-			"reason": reason,
+	msg := events.Wrapper{
+		Type: events.TypeConnectionKill,
+		Data: events.ConnectionKill{
+			Reason: reason,
 		},
 	}
 
@@ -88,7 +88,7 @@ func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID 
 }
 
 func (s *WebSocketService) Dispatch(ctx context.Context, userID int, evt events.SocketEvent) {
-	envelope := &events.WebSocketEvent{
+	envelope := &events.Wrapper{
 		Type: evt.GetType(),
 		Data: evt,
 	}
@@ -104,7 +104,7 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 		return
 	}
 
-	envelope := &events.WebSocketEvent{
+	envelope := &events.Wrapper{
 		Type: evt.GetType(),
 		Data: evt,
 	}

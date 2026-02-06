@@ -2,8 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
-	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strings"
@@ -12,15 +12,15 @@ import (
 )
 
 type UserService interface {
-	GetUsers(requester *entity.User) ([]*service.UserResponse, apierror.ErrorResponse)
-	GetUser(requester *entity.User, rawId string) (*service.UserResponse, apierror.ErrorResponse)
-	UpdateUser(requester *entity.User, targetId string, req *service.UpdateUserRequest) (*service.UserResponse, apierror.ErrorResponse)
+	GetUsers(requester *entity.User) ([]*contract.UserResponse, apierror.ErrorResponse)
+	GetUser(requester *entity.User, rawId string) (*contract.UserResponse, apierror.ErrorResponse)
+	UpdateUser(requester *entity.User, targetId string, req *contract.UpdateUserRequest) (*contract.UserResponse, apierror.ErrorResponse)
 	DeleteUser(requester *entity.User, targetId string) apierror.ErrorResponse
-	CheckEmail(req *service.UserStatusRequest) (*service.EmailStatus, apierror.ErrorResponse)
-	CreateUser(req *service.CreateUserRequest) apierror.ErrorResponse
-	Login(req *service.UserLoginRequest) (*service.UserLoginResponse, apierror.ErrorResponse)
-	ConfirmSignup(req *service.ConfirmSignupRequest) apierror.ErrorResponse
-	ResendConfirmation(req *service.ResendConfirmRequest) apierror.ErrorResponse
+	CheckEmail(req *contract.UserStatusRequest) (*contract.EmailStatus, apierror.ErrorResponse)
+	CreateUser(req *contract.CreateUserRequest) apierror.ErrorResponse
+	Login(req *contract.UserLoginRequest) (*contract.UserLoginResponse, apierror.ErrorResponse)
+	ConfirmSignup(req *contract.ConfirmSignupRequest) apierror.ErrorResponse
+	ResendConfirmation(req *contract.ResendConfirmRequest) apierror.ErrorResponse
 }
 
 type DefaultUserRoute struct {
@@ -71,7 +71,7 @@ func (u *DefaultUserRoute) UpdateUser(c echo.Context) error {
 	}
 
 	targetId := strings.TrimSpace(c.Param("id"))
-	var req service.UpdateUserRequest
+	var req contract.UpdateUserRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -102,7 +102,7 @@ func (u *DefaultUserRoute) DeleteUser(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
-	var req service.UserStatusRequest
+	var req contract.UserStatusRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -117,7 +117,7 @@ func (u *DefaultUserRoute) CheckEmail(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
-	var req service.CreateUserRequest
+	var req contract.CreateUserRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -130,7 +130,7 @@ func (u *DefaultUserRoute) CreateUser(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
-	var req service.UserLoginRequest
+	var req contract.UserLoginRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -143,7 +143,7 @@ func (u *DefaultUserRoute) CreateLogin(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
-	var req service.ConfirmSignupRequest
+	var req contract.ConfirmSignupRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -156,7 +156,7 @@ func (u *DefaultUserRoute) ConfirmSignup(c echo.Context) error {
 }
 
 func (u *DefaultUserRoute) ResendConfirmation(c echo.Context) error {
-	var req service.ResendConfirmRequest
+	var req contract.ResendConfirmRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}

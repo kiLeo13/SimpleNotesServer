@@ -233,19 +233,19 @@ func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror
 }
 
 func (n *DefaultNoteService) dispatchNoteCreateEvent(note *contract.NoteResponse) {
-	n.WSService.Broadcast(context.Background(), &events.CreateNoteEvent{
+	n.WSService.Broadcast(context.Background(), &events.NoteCreated{
 		NoteResponse: note,
 	})
 }
 
 func (n *DefaultNoteService) dispatchNoteUpdateEvent(note *contract.NoteResponse) {
-	n.WSService.Broadcast(context.Background(), &events.UpdateNoteEvent{
+	n.WSService.Broadcast(context.Background(), &events.NoteUpdated{
 		NoteResponse: note,
 	})
 }
 
 func (n *DefaultNoteService) dispatchNoteDeleteEvent(noteID int) {
-	n.WSService.Broadcast(context.Background(), &events.DeleteNoteEvent{
+	n.WSService.Broadcast(context.Background(), &events.NoteDeleted{
 		NoteID: noteID,
 	})
 }

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
-	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 	"strconv"
@@ -17,11 +17,11 @@ import (
 // NoteService interface updated to accept *entity.User instead of strings.
 // This allows the service to check permissions without hitting the DB again.
 type NoteService interface {
-	GetAllNotes() ([]*service.NoteResponse, apierror.ErrorResponse)
-	GetNoteByID(actor *entity.User, noteId int) (*service.NoteResponse, apierror.ErrorResponse)
-	CreateTextNote(actor *entity.User, req *service.TextNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
-	CreateFileNote(actor *entity.User, req *service.NoteRequest, fileHeader *multipart.FileHeader) (*service.NoteResponse, apierror.ErrorResponse)
-	UpdateNote(actor *entity.User, noteId int, req *service.UpdateNoteRequest) (*service.NoteResponse, apierror.ErrorResponse)
+	GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse)
+	GetNoteByID(actor *entity.User, noteId int) (*contract.NoteResponse, apierror.ErrorResponse)
+	CreateTextNote(actor *entity.User, req *contract.TextNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse)
+	CreateFileNote(actor *entity.User, req *contract.NoteRequest, fileHeader *multipart.FileHeader) (*contract.NoteResponse, apierror.ErrorResponse)
+	UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse)
 	DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse
 }
 
@@ -87,7 +87,7 @@ func (n *DefaultNoteRoute) UpdateNote(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, apierror.NewInvalidParamTypeError("id", "int"))
 	}
 
-	var req service.UpdateNoteRequest
+	var req contract.UpdateNoteRequest
 	if err = c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -123,7 +123,7 @@ func (n *DefaultNoteRoute) createFromText(c echo.Context) error {
 		return c.JSON(cerr.Code(), cerr)
 	}
 
-	var req service.TextNoteRequest
+	var req contract.TextNoteRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
@@ -146,7 +146,7 @@ func (n *DefaultNoteRoute) createFromFile(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, apierror.FormJSONRequiredError)
 	}
 
-	var req service.NoteRequest
+	var req contract.NoteRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
