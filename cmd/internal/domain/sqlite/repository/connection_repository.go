@@ -43,3 +43,13 @@ func (c *DefaultConnectionRepository) FindAll() ([]string, error) {
 	result := c.db.Model(&entity.Connection{}).Pluck("connection_id", &ids)
 	return ids, result.Error
 }
+
+func (c *DefaultConnectionRepository) FindExpired(now int64) ([]*entity.Connection, error) {
+	var conns []*entity.Connection
+	result := c.db.Where("expires_at < ?", now).Find(&conns)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return conns, nil
+}
