@@ -3,8 +3,8 @@ package jobs
 import (
 	"context"
 	"github.com/labstack/gommon/log"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
-	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"time"
@@ -50,8 +50,8 @@ func (c *ConnectionCleaner) cleanup() {
 
 	log.Infof("Cleaner: Found %d expired connections. Terminating...", len(conns))
 
-	envelope := events.Wrapper{
-		Type: events.TypeSessionExpired,
+	envelope := contract.OutgoingSocketMessage{
+		Type: contract.EventSessionExpired,
 	}
 
 	for _, conn := range conns {

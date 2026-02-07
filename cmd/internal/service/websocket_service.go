@@ -54,9 +54,9 @@ func (s *WebSocketService) RemoveConnection(connectionID string) {
 	_ = s.ConnRepo.Delete(connectionID)
 }
 
-func (s *WebSocketService) HandleMessage(msg *contract.WebSocketMessage, connID string) {
+func (s *WebSocketService) HandleMessage(msg *contract.IncomingSocketMessage, connID string) {
 	switch msg.Type {
-	case events.TypePing:
+	case contract.EventPing:
 		s.handlePing(connID)
 	}
 }
@@ -78,8 +78,8 @@ func (s *WebSocketService) PushToUser(ctx context.Context, userID int, payload i
 func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int, reason *string) {
 	conns, _ := s.ConnRepo.FindByUserID(userID)
 
-	msg := events.Wrapper{
-		Type: events.TypeConnectionKill,
+	msg := contract.OutgoingSocketMessage{
+		Type: contract.EventConnectionKill,
 		Data: events.ConnectionKill{
 			Reason: reason,
 		},
@@ -97,7 +97,7 @@ func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID 
 }
 
 func (s *WebSocketService) Dispatch(ctx context.Context, userID int, evt events.SocketEvent) {
-	envelope := &events.Wrapper{
+	envelope := &contract.OutgoingSocketMessage{
 		Type: evt.GetType(),
 		Data: evt,
 	}
@@ -113,7 +113,7 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 		return
 	}
 
-	envelope := &events.Wrapper{
+	envelope := &contract.OutgoingSocketMessage{
 		Type: evt.GetType(),
 		Data: evt,
 	}

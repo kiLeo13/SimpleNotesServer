@@ -14,7 +14,7 @@ import (
 type WebSocketService interface {
 	RegisterConnection(userID int, connID string, exp int64) apierror.ErrorResponse
 	RemoveConnection(connectionID string)
-	HandleMessage(msg *contract.WebSocketMessage, connID string)
+	HandleMessage(msg *contract.IncomingSocketMessage, connID string)
 }
 
 type DefaultWSRoute struct {
@@ -57,7 +57,7 @@ func (h *DefaultWSRoute) HandleDisconnect(c echo.Context) error {
 
 func (h *DefaultWSRoute) HandleMessage(c echo.Context) error {
 	connID := c.Request().Header.Get(websocket.HeaderConnectionID)
-	var msg contract.WebSocketMessage
+	var msg contract.IncomingSocketMessage
 	if err := json.NewDecoder(c.Request().Body).Decode(&msg); err != nil {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}

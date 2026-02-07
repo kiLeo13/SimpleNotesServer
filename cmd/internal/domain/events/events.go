@@ -2,73 +2,52 @@ package events
 
 import "simplenotes/cmd/internal/contract"
 
-type EventType string
-
-const (
-	TypePing EventType = "ping"
-
-	TypeConnectionKill EventType = "CONNECTION_KILL"
-	TypeSessionExpired EventType = "SESSION_EXPIRED"
-	TypeAck            EventType = "ACK"
-
-	TypeNoteCreated EventType = "NOTE_CREATED"
-	TypeNoteUpdated EventType = "NOTE_UPDATED"
-	TypeNoteDeleted EventType = "NOTE_DELETED"
-
-	TypeUserUpdated EventType = "USER_UPDATED"
-)
-
-type Wrapper struct {
-	Type EventType   `json:"type"`
-	Data interface{} `json:"data,omitempty"`
-}
-
 type SocketEvent interface {
-	GetType() EventType
+	GetType() contract.EventType
 }
 
 type Ack struct{}
 
-func (Ack) GetType() EventType {
-	return TypeAck
+func (Ack) GetType() contract.EventType {
+	return contract.EventAck
 }
 
 type ConnectionKill struct {
 	Reason *string `json:"reason,omitempty"`
 }
 
-func (e *ConnectionKill) GetType() EventType {
-	return TypeConnectionKill
+func (e *ConnectionKill) GetType() contract.EventType {
+	return contract.EventConnectionKill
 }
 
 type NoteCreated struct {
 	*contract.NoteResponse
 }
 
-func (e *NoteCreated) GetType() EventType {
-	return TypeNoteCreated
+func (e *NoteCreated) GetType() contract.EventType {
+	return contract.EventNoteCreated
 }
 
 type NoteUpdated struct {
 	*contract.NoteResponse
 }
 
-func (e *NoteUpdated) GetType() EventType {
-	return TypeNoteUpdated
+func (e *NoteUpdated) GetType() contract.EventType {
+	return contract.EventNoteUpdated
 }
 
 type NoteDeleted struct {
 	NoteID int `json:"id"`
 }
 
-func (e *NoteDeleted) GetType() EventType {
-	return TypeNoteDeleted
+func (e *NoteDeleted) GetType() contract.EventType {
+	return contract.EventNoteDeleted
 }
 
 type UserUpdated struct {
 	*contract.UserResponse
 }
 
-func (e *UserUpdated) GetType() EventType {
-	return TypeUserUpdated
+func (e *UserUpdated) GetType() contract.EventType {
+	return contract.EventUserUpdated
 }
