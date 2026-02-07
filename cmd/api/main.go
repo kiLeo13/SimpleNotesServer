@@ -146,6 +146,7 @@ func registerRoutes(
 	ws := e.Group("/ws")
 
 	ws.POST("/connect", wsH.HandleConnect, authMiddleware)
+	ws.POST("/default", wsH.HandleMessage)
 	ws.POST("/disconnect", wsH.HandleDisconnect)
 }
 
