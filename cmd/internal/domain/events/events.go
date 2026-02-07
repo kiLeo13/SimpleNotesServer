@@ -5,8 +5,11 @@ import "simplenotes/cmd/internal/contract"
 type EventType string
 
 const (
+	TypePing EventType = "ping"
+
 	TypeConnectionKill EventType = "CONNECTION_KILL"
 	TypeSessionExpired EventType = "SESSION_EXPIRED"
+	TypeAck            EventType = "ACK"
 
 	TypeNoteCreated EventType = "NOTE_CREATED"
 	TypeNoteUpdated EventType = "NOTE_UPDATED"
@@ -22,6 +25,12 @@ type Wrapper struct {
 
 type SocketEvent interface {
 	GetType() EventType
+}
+
+type Ack struct{}
+
+func (Ack) GetType() EventType {
+	return TypeAck
 }
 
 type ConnectionKill struct {
