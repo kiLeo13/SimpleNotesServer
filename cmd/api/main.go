@@ -100,7 +100,7 @@ func main() {
 	// --- Register Routes ---
 	registerRoutes(e, noteRoutes, userRoutes, connRoutes, authMiddleware)
 
-	if err := e.Start(":7070"); err != nil {
+	if err = e.Start(":7070"); err != nil {
 		panic(err)
 	}
 }
