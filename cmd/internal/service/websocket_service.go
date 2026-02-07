@@ -104,6 +104,14 @@ func (s *WebSocketService) Dispatch(ctx context.Context, userID int, evt events.
 	s.PushToUser(ctx, userID, envelope)
 }
 
+func (s *WebSocketService) DispatchToConnection(ctx context.Context, connID string, evt events.SocketEvent) {
+	envelope := &contract.OutgoingSocketMessage{
+		Type: evt.GetType(),
+		Data: evt,
+	}
+	_ = s.Gateway.PostToConnection(ctx, connID, envelope)
+}
+
 // Broadcast sends an event to ALL connected users.
 // This iterates through every active connection in the DB.
 func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent) {
@@ -132,7 +140,7 @@ func (s *WebSocketService) handlePing(connID string) {
 	}
 
 	go func(conn string) {
-		err = s.Gateway.PostToConnection(context.Background(), conn, &events.Ack{})
+		s.DispatchToConnection(context.Background(), conn, &events.Ack{})
 		if err != nil {
 			log.Errorf("failed to post ack to conn %s: %v", conn, err)
 		}

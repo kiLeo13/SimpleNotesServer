@@ -8,7 +8,7 @@ type SocketEvent interface {
 
 type Ack struct{}
 
-func (Ack) GetType() contract.EventType {
+func (*Ack) GetType() contract.EventType {
 	return contract.EventAck
 }
 
