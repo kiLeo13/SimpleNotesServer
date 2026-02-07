@@ -3,34 +3,55 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/gommon/log"
 	"strings"
 )
 
-var parser = new(jwt.Parser)
+var jwks keyfunc.Keyfunc
 
-type TokenData struct {
-	// Sub describes the user's ID on Cognito.
-	// This value will never be empty.
-	Sub string
+func InitJWKS(region, poolID string) error {
+	// URL where Cognito publishes its public keys
+	jwksURL := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s/.well-known/jwks.json", region, poolID)
 
-	// Email the user's Email.
-	// This value will be empty if the provided token is an Access Token, for instance.
-	Email string
-
-	Exp int64
-}
-
-func ParseTokenData(token string) (*TokenData, error) {
-	if token == "" {
-		return nil, errors.New("token is empty")
+	var err error
+	jwks, err = keyfunc.NewDefault([]string{jwksURL})
+	if err != nil {
+		return fmt.Errorf("failed to create JWKS from resource at %s: %w", jwksURL, err)
 	}
 
-	clean := sanitizeToken(token)
-	claims, err := GetUnsafeClaims(clean)
+	log.Infof("JWKS initialized. Keys loaded from %s", jwksURL)
+	return nil
+}
+
+type TokenData struct {
+	Sub   string
+	Email string
+	Exp   int64
+}
+
+// ValidateToken parses AND validates the signature locally.
+// It returns the data if the token is authentic and unexpired.
+func ValidateToken(tokenString string) (*TokenData, error) {
+	if jwks == nil {
+		return nil, errors.New("JWKS not initialized")
+	}
+
+	clean := sanitizeToken(tokenString)
+	token, err := jwt.Parse(clean, jwks.Keyfunc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	if !token.Valid {
+		return nil, errors.New("token is not valid")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("invalid claims format")
 	}
 
 	return &TokenData{
@@ -41,41 +62,19 @@ func ParseTokenData(token string) (*TokenData, error) {
 }
 
 func ParseTokenDataCtx(ctx echo.Context) (*TokenData, error) {
-	token := ctx.Request().Header.Get("Authorization")
-	clean := sanitizeToken(token)
-	return ParseTokenData(clean)
-}
-
-// GetUnsafeClaims DOES NOT check if the claims are valid.
-// However, we are safe to use it, as all requests go through API Gateway first.
-func GetUnsafeClaims(tokenString string) (jwt.MapClaims, error) {
-	token, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
-	if err != nil {
-		return nil, err
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		return claims, nil
-	}
-	return nil, fmt.Errorf("invalid claims format")
+	token := ctx.Request().Header.Get(echo.HeaderAuthorization)
+	return ValidateToken(token)
 }
 
 func sanitizeToken(token string) string {
-	var clean string
-	if strings.HasPrefix(token, "Bearer") {
-		clean = strings.TrimPrefix(token, "Bearer")
-	} else {
-		clean = token
-	}
-	return strings.TrimSpace(clean)
+	return strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
 }
 
 func getValue(claims jwt.MapClaims, key string) string {
-	claim, ok := claims[key].(string)
-	if !ok {
-		return ""
+	if val, ok := claims[key].(string); ok {
+		return val
 	}
-	return claim
+	return ""
 }
 
 func getInt64(claims jwt.MapClaims, key string) int64 {
@@ -83,11 +82,9 @@ func getInt64(claims jwt.MapClaims, key string) int64 {
 	if !ok {
 		return 0
 	}
-
 	if f, ok := val.(float64); ok {
 		return int64(f)
 	}
-
 	if i, ok := val.(int64); ok {
 		return i
 	}

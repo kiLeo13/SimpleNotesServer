@@ -2,8 +2,6 @@ package cognito
 
 import (
 	"context"
-	"os"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
@@ -73,10 +71,7 @@ type cognitoClient struct {
 	appClientId   string
 }
 
-func InitCognitoClient() (Client, error) {
-	appClientId := os.Getenv("AWS_COGNITO_CLIENT_ID")
-	region := os.Getenv("AWS_COGNITO_REGION")
-	poolId := os.Getenv("AWS_COGNITO_USER_POOL_ID")
+func InitCognitoClient(appClientID, region, poolID string) (Client, error) {
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return nil, err
@@ -85,8 +80,8 @@ func InitCognitoClient() (Client, error) {
 	client := cognitoidentityprovider.NewFromConfig(cfg)
 	return &cognitoClient{
 		cognitoClient: client,
-		poolId:        poolId,
-		appClientId:   appClientId,
+		poolId:        poolID,
+		appClientId:   appClientID,
 	}, nil
 }
 

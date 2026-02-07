@@ -13,6 +13,7 @@ import (
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/service/jobs"
+	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/validators"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -45,11 +46,20 @@ func main() {
 		panic(err)
 	}
 
-	cogClient, err := cognitoclient.InitCognitoClient()
+	// --- Cognito/Auth Init ---
+	appClientID := os.Getenv("AWS_COGNITO_CLIENT_ID")
+	region := os.Getenv("AWS_COGNITO_REGION")
+	poolID := os.Getenv("AWS_COGNITO_USER_POOL_ID")
+	cogClient, err := cognitoclient.InitCognitoClient(appClientID, region, poolID)
 	if err != nil {
 		panic(err)
 	}
 
+	if err = utils.InitJWKS(region, poolID); err != nil {
+		panic(err)
+	}
+
+	// --- Storage Init ---
 	s3Client, err := storage.NewStorageClient()
 	if err != nil {
 		panic(err)
