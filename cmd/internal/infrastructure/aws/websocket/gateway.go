@@ -9,6 +9,8 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
+const HeaderConnectionID = "X-Connection-Id"
+
 type GatewayClient interface {
 	PostToConnection(ctx context.Context, connID string, data interface{}) error
 	DeleteConnection(ctx context.Context, connID string) error

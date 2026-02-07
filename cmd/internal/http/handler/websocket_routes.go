@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"simplenotes/cmd/internal/infrastructure/aws/websocket"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -23,7 +24,7 @@ func (h *DefaultWSRoute) HandleConnect(c echo.Context) error {
 		return c.JSON(cerr.Code(), cerr)
 	}
 
-	connID := c.Request().Header.Get("X-Connection-Id")
+	connID := c.Request().Header.Get(websocket.HeaderConnectionID)
 	if connID == "" {
 		return c.JSON(http.StatusBadRequest, apierror.NewMissingParamError("connectionId"))
 	}
@@ -40,7 +41,7 @@ func (h *DefaultWSRoute) HandleConnect(c echo.Context) error {
 }
 
 func (h *DefaultWSRoute) HandleDisconnect(c echo.Context) error {
-	connID := c.Request().Header.Get("X-Connection-Id")
+	connID := c.Request().Header.Get(websocket.HeaderConnectionID)
 	if connID != "" {
 		h.WSService.RemoveConnection(connID)
 	}
