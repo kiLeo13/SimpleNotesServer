@@ -10,3 +10,4 @@ LICENSE
 tmp
 build
 .DS_Store
+/infrastructure
