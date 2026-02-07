@@ -140,7 +140,9 @@ func (s *WebSocketService) handlePing(connID string) {
 	}
 
 	go func(conn string) {
-		s.DispatchToConnection(context.Background(), conn, nil)
+		_ = s.Gateway.PostToConnection(context.Background(), conn, &contract.OutgoingSocketMessage{
+			Type: contract.EventAck,
+		})
 		if err != nil {
 			log.Errorf("failed to post ack to conn %s: %v", conn, err)
 		}
