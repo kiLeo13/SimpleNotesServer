@@ -3,18 +3,22 @@ package handler
 import (
 	"net/http"
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
-	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
 
 	"github.com/labstack/echo/v4"
 )
 
-type DefaultWSRoute struct {
-	WSService *service.WebSocketService
+type WebSocketService interface {
+	RegisterConnection(userID int, connID string, exp int64) apierror.ErrorResponse
+	RemoveConnection(connectionID string)
 }
 
-func NewWSDefault(wsService *service.WebSocketService) *DefaultWSRoute {
+type DefaultWSRoute struct {
+	WSService WebSocketService
+}
+
+func NewWSDefault(wsService WebSocketService) *DefaultWSRoute {
 	return &DefaultWSRoute{WSService: wsService}
 }
 
