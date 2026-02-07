@@ -44,16 +44,6 @@ func (c *DefaultConnectionRepository) FindAll() ([]string, error) {
 	return ids, result.Error
 }
 
-func (c *DefaultConnectionRepository) FindExpired(now int64) ([]*entity.Connection, error) {
-	var conns []*entity.Connection
-	result := c.db.Where("expires_at < ?", now).Find(&conns)
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return conns, nil
-}
-
 func (c *DefaultConnectionRepository) FindStale(now int64, heartbeatThreshold int64) ([]*entity.Connection, error) {
 	var conns []*entity.Connection
 	err := c.db.Where("expires_at < ?", now).

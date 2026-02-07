@@ -17,7 +17,7 @@ type ConnectionRepository interface {
 	Delete(connID string) error
 	FindByUserID(userID int) ([]string, error)
 	FindAll() ([]string, error)
-	FindExpired(now int64) ([]*entity.Connection, error)
+	FindStale(now int64, hbLimit int64) ([]*entity.Connection, error)
 }
 
 type WebSocketService struct {

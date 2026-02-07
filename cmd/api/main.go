@@ -70,7 +70,7 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 
 	connService := service.NewWebSocketService(connRepo, wsClient)
-	userService := service.NewUserService(userRepo, validate, cogClient, userPolicy)
+	userService := service.NewUserService(userRepo, validate, connService, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate)
 
 	connRoutes := handler.NewWSDefault(connService)

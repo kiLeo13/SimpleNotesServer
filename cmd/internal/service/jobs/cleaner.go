@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"github.com/labstack/gommon/log"
+	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
@@ -18,7 +19,6 @@ func NewConnectionCleaner(wsService *service.WebSocketService) *ConnectionCleane
 }
 
 func (c *ConnectionCleaner) Start(ctx context.Context) {
-	// Poll every 5 minutes
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -37,7 +37,8 @@ func (c *ConnectionCleaner) Start(ctx context.Context) {
 
 func (c *ConnectionCleaner) cleanup() {
 	now := utils.NowUTC()
-	conns, err := c.wsService.ConnRepo.FindExpired(now)
+	threshold := now - ((entity.HeartbeatPeriodMillis * 2) - entity.HeartbeatMissToleranceMillis)
+	conns, err := c.wsService.ConnRepo.FindStale(now, threshold)
 	if err != nil {
 		log.Errorf("Cleaner: failed to fetch expired connections: %v", err)
 		return
