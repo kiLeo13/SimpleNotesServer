@@ -1,4 +1,4 @@
-package cognitoclient
+package cognito
 
 import (
 	"context"
