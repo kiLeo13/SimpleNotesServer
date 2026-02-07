@@ -36,7 +36,7 @@ func (s *WebSocketService) RegisterConnection(userID int, connectionID string, e
 	conn := &entity.Connection{
 		ConnectionID: connectionID,
 		UserID:       userID,
-		ExpiresAt:    exp,
+		ExpiresAt:    exp * 1000, // "exp" is stored in seconds, our app uses millis
 		CreatedAt:    utils.NowUTC(),
 	}
 
