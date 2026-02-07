@@ -185,8 +185,6 @@ func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.Error
 
 	err = u.UserRepo.Save(user)
 	if err != nil {
-		// Well... for our case, I have no idea how can SQLite fail here,
-		// but better safe than sorry?
 		revert()
 		log.Errorf("failed to create user: %v", err)
 		return apierror.InternalServerError
