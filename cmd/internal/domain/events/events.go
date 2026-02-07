@@ -13,7 +13,8 @@ func (*Ack) GetType() contract.EventType {
 }
 
 type ConnectionKill struct {
-	Reason *string `json:"reason,omitempty"`
+	Code   contract.KillCode `json:"code"`
+	Reason *string           `json:"reason,omitempty"`
 }
 
 func (e *ConnectionKill) GetType() contract.EventType {

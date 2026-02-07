@@ -2,12 +2,15 @@ package jobs
 
 import (
 	"context"
-	"github.com/labstack/gommon/log"
 	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
+	"time"
+
+	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/utils"
-	"time"
+
+	"github.com/labstack/gommon/log"
 )
 
 type ConnectionCleaner struct {
@@ -19,7 +22,7 @@ func NewConnectionCleaner(wsService *service.WebSocketService) *ConnectionCleane
 }
 
 func (c *ConnectionCleaner) Start(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	log.Info("Connection cleaner cron started")
@@ -37,10 +40,10 @@ func (c *ConnectionCleaner) Start(ctx context.Context) {
 
 func (c *ConnectionCleaner) cleanup() {
 	now := utils.NowUTC()
-	threshold := now - ((entity.HeartbeatPeriodMillis * 2) - entity.HeartbeatMissToleranceMillis)
-	conns, err := c.wsService.ConnRepo.FindStale(now, threshold)
+	heartbeatCutoff := now - ((entity.HeartbeatPeriodMillis * 2) + entity.HeartbeatToleranceMillis)
+	conns, err := c.wsService.ConnRepo.FindStale(now, heartbeatCutoff)
 	if err != nil {
-		log.Errorf("Cleaner: failed to fetch expired connections: %v", err)
+		log.Errorf("Cleaner: failed to fetch stale connections: %v", err)
 		return
 	}
 
@@ -48,23 +51,29 @@ func (c *ConnectionCleaner) cleanup() {
 		return
 	}
 
-	log.Infof("Cleaner: Found %d expired connections. Terminating...", len(conns))
-
-	envelope := contract.OutgoingSocketMessage{
-		Type: contract.EventSessionExpired,
-	}
+	log.Infof("Cleaner: Found %d stale connections. Terminating...", len(conns))
 
 	for _, conn := range conns {
-		// Use a fresh context for network calls, detached from the ticker's timing
-		bgCtx := context.Background()
+		var envelope contract.OutgoingSocketMessage
 
-		// Notify Client (So they know NOT to try reconnecting)
+		if conn.ExpiresAt < now {
+			envelope = contract.OutgoingSocketMessage{
+				Type: contract.EventSessionExpired,
+			}
+		} else {
+			envelope = contract.OutgoingSocketMessage{
+				Type: contract.EventConnectionKill,
+				Data: events.ConnectionKill{
+					Code: contract.CodeIdleTimeout,
+				},
+			}
+		}
+
+		bgCtx := context.Background()
 		_ = c.wsService.Gateway.PostToConnection(bgCtx, conn.ConnectionID, envelope)
 
-		// Tell AWS we are dropping the connection
 		_ = c.wsService.Gateway.DeleteConnection(bgCtx, conn.ConnectionID)
 
-		// Remove from our DB
 		_ = c.wsService.ConnRepo.Delete(conn.ConnectionID)
 	}
 }

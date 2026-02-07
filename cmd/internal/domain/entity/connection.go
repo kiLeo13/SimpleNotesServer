@@ -1,7 +1,14 @@
 package entity
 
-const HeartbeatPeriodMillis = 60 * 1000
-const HeartbeatMissToleranceMillis = 10 * 1000
+import "time"
+
+const (
+	HeartbeatPeriod    = 60 * time.Second
+	HeartbeatTolerance = 10 * time.Second
+
+	HeartbeatPeriodMillis    = int64(60 * 1000)
+	HeartbeatToleranceMillis = int64(10 * 1000)
+)
 
 type Connection struct {
 	ConnectionID    string `gorm:"primaryKey;autoIncrement:false"`

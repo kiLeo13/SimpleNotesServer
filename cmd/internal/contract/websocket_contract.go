@@ -16,6 +16,13 @@ const (
 	EventUserUpdated EventType = "USER_UPDATED"
 )
 
+type KillCode string
+
+const (
+	CodeSuspendedAccount KillCode = "SUSPENDED_ACCOUNT"
+	CodeIdleTimeout      KillCode = "IDLE_TIMEOUT"
+)
+
 // IncomingSocketMessage is used for messages we receive from the users.
 type IncomingSocketMessage struct {
 	Type EventType `json:"type"`
