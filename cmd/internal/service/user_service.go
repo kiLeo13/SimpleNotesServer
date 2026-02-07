@@ -358,7 +358,9 @@ func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserRes
 	})
 
 	if user.Suspended != nil && *user.Suspended {
-		u.WSService.TerminateUserConnections(context.Background(), destID, nil)
+		u.WSService.TerminateUserConnections(context.Background(), destID, &events.ConnectionKill{
+			Code: contract.CodeSuspendedAccount,
+		})
 	}
 }
 
