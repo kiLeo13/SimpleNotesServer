@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
+	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/domain/policy"
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
@@ -27,14 +29,22 @@ type UserRepository interface {
 type UserService struct {
 	UserRepo   UserRepository
 	Validate   *validator.Validate
+	WSService  *WebSocketService
 	Cognito    cognitoclient.CognitoInterface
 	UserPolicy *policy.UserPolicy
 }
 
-func NewUserService(userRepo UserRepository, validate *validator.Validate, cogClient cognitoclient.CognitoInterface, userPolicy *policy.UserPolicy) *UserService {
+func NewUserService(
+	userRepo UserRepository,
+	validate *validator.Validate,
+	wsService *WebSocketService,
+	cogClient cognitoclient.CognitoInterface,
+	userPolicy *policy.UserPolicy,
+) *UserService {
 	return &UserService{
 		UserRepo:   userRepo,
 		Validate:   validate,
+		WSService:  wsService,
 		Cognito:    cogClient,
 		UserPolicy: userPolicy,
 	}
@@ -92,14 +102,17 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		return nil, updater.err
 	}
 
+	var resp *contract.UserResponse
 	if updater.dirty {
 		target.UpdatedAt = utils.NowUTC()
 		if err := u.UserRepo.Save(target); err != nil {
 			log.Errorf("actor %s failed to update user %s: %v", actor.SubUUID, targetId, err)
 			return nil, apierror.InternalServerError
 		}
+		resp = toUserResponse(target, actor)
+		u.dispatchUserUpdateEvent(target.ID, resp)
 	}
-	return toUserResponse(target, actor), nil
+	return resp, nil
 }
 
 func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierror.ErrorResponse {
@@ -121,6 +134,7 @@ func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierro
 		log.Errorf("failed to delete user %d: %v", target.ID, derr)
 		return apierror.InternalServerError
 	}
+	u.dispatchUserDeleteEvent(target.ID)
 	return nil
 }
 
@@ -172,7 +186,6 @@ func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.Error
 		return apierr
 	}
 
-	// This is our user, in our database <3
 	now := utils.NowUTC()
 	user := &entity.User{
 		SubUUID:       uuid,
@@ -337,6 +350,20 @@ func (u *UserService) fetchByID(rawId string, force bool) (*entity.User, apierro
 		return nil, apierror.InternalServerError
 	}
 	return user, nil
+}
+
+func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserResponse) {
+	u.WSService.Dispatch(context.Background(), destID, &events.UserUpdated{
+		UserResponse: user,
+	})
+
+	if user.Suspended != nil && *user.Suspended {
+		u.WSService.TerminateUserConnections(context.Background(), destID, nil)
+	}
+}
+
+func (u *UserService) dispatchUserDeleteEvent(userID int) {
+	u.WSService.TerminateUserConnections(context.Background(), userID, nil)
 }
 
 func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {

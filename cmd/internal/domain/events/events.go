@@ -55,3 +55,11 @@ type NoteDeleted struct {
 func (e *NoteDeleted) GetType() EventType {
 	return TypeNoteDeleted
 }
+
+type UserUpdated struct {
+	*contract.UserResponse
+}
+
+func (e *UserUpdated) GetType() EventType {
+	return TypeUserUpdated
+}
