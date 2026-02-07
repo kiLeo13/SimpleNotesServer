@@ -53,3 +53,18 @@ func (c *DefaultConnectionRepository) FindExpired(now int64) ([]*entity.Connecti
 	}
 	return conns, nil
 }
+
+func (c *DefaultConnectionRepository) FindStale(now int64, heartbeatThreshold int64) ([]*entity.Connection, error) {
+	var conns []*entity.Connection
+	err := c.db.Where("expires_at < ?", now).
+		Or("last_heartbeat_at < ?", heartbeatThreshold).
+		Find(&conns).Error
+
+	return conns, err
+}
+
+func (c *DefaultConnectionRepository) UpdateHeartbeat(connID string, now int64) error {
+	return c.db.Model(&entity.Connection{}).
+		Where("connection_id = ?", connID).
+		Update("last_heartbeat_at", now).Error
+}
