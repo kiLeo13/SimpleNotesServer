@@ -34,7 +34,7 @@ type AuthCreate struct {
 	AccessToken string
 }
 
-type CognitoInterface interface {
+type Client interface {
 	//==============================//
 	//                              //
 	//     Self-user Operations     //
@@ -73,7 +73,7 @@ type cognitoClient struct {
 	appClientId   string
 }
 
-func InitCognitoClient() (CognitoInterface, error) {
+func InitCognitoClient() (Client, error) {
 	appClientId := os.Getenv("AWS_COGNITO_CLIENT_ID")
 	region := os.Getenv("AWS_COGNITO_REGION")
 	poolId := os.Getenv("AWS_COGNITO_USER_POOL_ID")

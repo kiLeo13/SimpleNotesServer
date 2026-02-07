@@ -30,7 +30,7 @@ type UserService struct {
 	UserRepo   UserRepository
 	Validate   *validator.Validate
 	WSService  *WebSocketService
-	Cognito    cognitoclient.CognitoInterface
+	Cognito    cognitoclient.Client
 	UserPolicy *policy.UserPolicy
 }
 
@@ -38,7 +38,7 @@ func NewUserService(
 	userRepo UserRepository,
 	validate *validator.Validate,
 	wsService *WebSocketService,
-	cogClient cognitoclient.CognitoInterface,
+	cogClient cognitoclient.Client,
 	userPolicy *policy.UserPolicy,
 ) *UserService {
 	return &UserService{
@@ -366,7 +366,7 @@ func (u *UserService) dispatchUserDeleteEvent(userID int) {
 	u.WSService.TerminateUserConnections(context.Background(), userID, nil)
 }
 
-func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
+func handleUserSignup(cogClient cognitoclient.Client, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
 	revert := func() {
 		_ = cogClient.AdminDeleteUser(req.Email)
 	}
@@ -378,7 +378,7 @@ func handleUserSignup(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 	return uuid, nil, revert
 }
 
-func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, apierror.ErrorResponse) {
+func handleUserSignin(cogClient cognitoclient.Client, req *cognitoclient.UserLogin) (*cognitoclient.AuthCreate, apierror.ErrorResponse) {
 	auth, err := cogClient.SignIn(req)
 	if err != nil {
 		return nil, utils.MapCognitoError(err)
@@ -386,7 +386,7 @@ func handleUserSignin(cogClient cognitoclient.CognitoInterface, req *cognitoclie
 	return auth, nil
 }
 
-func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cognitoclient.UserConfirmation) apierror.ErrorResponse {
+func handleSignupConfirmation(cogClient cognitoclient.Client, req *cognitoclient.UserConfirmation) apierror.ErrorResponse {
 	err := cogClient.ConfirmAccount(req)
 	if err != nil {
 		return utils.MapCognitoError(err)
@@ -394,7 +394,7 @@ func handleSignupConfirmation(cogClient cognitoclient.CognitoInterface, req *cog
 	return nil
 }
 
-func handleConfirmResend(cogClient cognitoclient.CognitoInterface, email string) apierror.ErrorResponse {
+func handleConfirmResend(cogClient cognitoclient.Client, email string) apierror.ErrorResponse {
 	err := cogClient.ResendConfirmation(email)
 	if err != nil {
 		return utils.MapCognitoError(err)
