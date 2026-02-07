@@ -66,7 +66,7 @@ func (s *WebSocketService) PushToUser(ctx context.Context, userID int, payload i
 }
 
 // TerminateUserConnections sends a "poison pill" message and then disconnects
-func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int, reason string) {
+func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int, reason *string) {
 	conns, _ := s.ConnRepo.FindByUserID(userID)
 
 	msg := events.Wrapper{

@@ -23,7 +23,7 @@ type SocketEvent interface {
 }
 
 type ConnectionKill struct {
-	Reason string `json:"reason"`
+	Reason *string `json:"reason,omitempty"`
 }
 
 func (e ConnectionKill) GetType() EventType {
