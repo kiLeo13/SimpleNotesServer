@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"github.com/labstack/echo/v4"
-	"net/http"
 	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/events"
@@ -56,10 +54,10 @@ func (s *WebSocketService) RemoveConnection(connectionID string) {
 	_ = s.ConnRepo.Delete(connectionID)
 }
 
-func (s *WebSocketService) HandleMessage(c echo.Context, msg *contract.WebSocketMessage, connID string) {
+func (s *WebSocketService) HandleMessage(msg *contract.WebSocketMessage, connID string) {
 	switch msg.Type {
 	case events.TypePing:
-
+		s.handlePing(connID)
 	}
 }
 
@@ -125,12 +123,12 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 	}
 }
 
-func (s *WebSocketService) handlePing(c echo.Context, connID string) error {
+func (s *WebSocketService) handlePing(connID string) {
 	now := utils.NowUTC()
 	err := s.ConnRepo.UpdateHeartbeat(connID, now)
 	if err != nil {
 		log.Errorf("failed to update heartbeat: %v", err)
-		return nil
+		return
 	}
 
 	go func(conn string) {
@@ -139,5 +137,4 @@ func (s *WebSocketService) handlePing(c echo.Context, connID string) error {
 			log.Errorf("failed to post ack to conn %s: %v", conn, err)
 		}
 	}(connID)
-	return c.NoContent(http.StatusOK)
 }

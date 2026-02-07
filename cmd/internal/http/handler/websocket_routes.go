@@ -14,7 +14,7 @@ import (
 type WebSocketService interface {
 	RegisterConnection(userID int, connID string, exp int64) apierror.ErrorResponse
 	RemoveConnection(connectionID string)
-	HandleMessage(c echo.Context, msg *contract.WebSocketMessage, connID string)
+	HandleMessage(msg *contract.WebSocketMessage, connID string)
 }
 
 type DefaultWSRoute struct {
@@ -62,6 +62,6 @@ func (h *DefaultWSRoute) HandleMessage(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
 	}
 
-	h.WSService.HandleMessage(c, &msg, connID)
+	h.WSService.HandleMessage(&msg, connID)
 	return c.NoContent(http.StatusOK)
 }
