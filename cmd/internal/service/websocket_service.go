@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"github.com/labstack/echo/v4"
+	"net/http"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/events"
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
@@ -18,6 +21,7 @@ type ConnectionRepository interface {
 	FindByUserID(userID int) ([]string, error)
 	FindAll() ([]string, error)
 	FindStale(now int64, hbLimit int64) ([]*entity.Connection, error)
+	UpdateHeartbeat(connID string, now int64) error
 }
 
 type WebSocketService struct {
@@ -50,6 +54,13 @@ func (s *WebSocketService) RegisterConnection(userID int, connectionID string, e
 func (s *WebSocketService) RemoveConnection(connectionID string) {
 	// We don't return error here because if it fails, it's not the client's fault
 	_ = s.ConnRepo.Delete(connectionID)
+}
+
+func (s *WebSocketService) HandleMessage(c echo.Context, msg *contract.WebSocketMessage, connID string) {
+	switch msg.Type {
+	case events.TypePing:
+
+	}
 }
 
 func (s *WebSocketService) PushToUser(ctx context.Context, userID int, payload interface{}) {
@@ -112,4 +123,21 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 	for _, connID := range conns {
 		_ = s.Gateway.PostToConnection(ctx, connID, envelope)
 	}
+}
+
+func (s *WebSocketService) handlePing(c echo.Context, connID string) error {
+	now := utils.NowUTC()
+	err := s.ConnRepo.UpdateHeartbeat(connID, now)
+	if err != nil {
+		log.Errorf("failed to update heartbeat: %v", err)
+		return nil
+	}
+
+	go func(conn string) {
+		err = s.Gateway.PostToConnection(context.Background(), conn, &events.Ack{})
+		if err != nil {
+			log.Errorf("failed to post ack to conn %s: %v", conn, err)
+		}
+	}(connID)
+	return c.NoContent(http.StatusOK)
 }

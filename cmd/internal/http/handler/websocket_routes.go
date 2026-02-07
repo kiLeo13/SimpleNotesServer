@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
+	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -12,6 +14,7 @@ import (
 type WebSocketService interface {
 	RegisterConnection(userID int, connID string, exp int64) apierror.ErrorResponse
 	RemoveConnection(connectionID string)
+	HandleMessage(c echo.Context, msg *contract.WebSocketMessage, connID string)
 }
 
 type DefaultWSRoute struct {
@@ -49,5 +52,16 @@ func (h *DefaultWSRoute) HandleDisconnect(c echo.Context) error {
 	if connID != "" {
 		h.WSService.RemoveConnection(connID)
 	}
+	return c.NoContent(http.StatusOK)
+}
+
+func (h *DefaultWSRoute) HandleMessage(c echo.Context) error {
+	connID := c.Request().Header.Get(websocket.HeaderConnectionID)
+	var msg contract.WebSocketMessage
+	if err := json.NewDecoder(c.Request().Body).Decode(&msg); err != nil {
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
+	}
+
+	h.WSService.HandleMessage(c, &msg, connID)
 	return c.NoContent(http.StatusOK)
 }
