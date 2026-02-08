@@ -27,6 +27,10 @@ type UpdateUserRequest struct {
 	Suspended *bool   `json:"suspended" validate:"omitempty"`
 }
 
+type LogoutRequest struct {
+	AccessToken string `json:"access_token"`
+}
+
 type ConfirmSignupRequest struct {
 	Email string `json:"email" validate:"required,email"`
 	Code  string `json:"code" validate:"required,min=1,max=8"`

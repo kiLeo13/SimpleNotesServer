@@ -130,7 +130,7 @@ func registerRoutes(
 
 	// User Auth & Registration
 	public.POST("/users/login", userH.CreateLogin)
-	public.POST("/users", userH.CreateUser) // Registration is public
+	public.POST("/users", userH.CreateUser)
 	public.POST("/users/check-email", userH.CheckEmail)
 	public.POST("/users/confirms", userH.ConfirmSignup)
 	public.POST("/users/confirms/resend", userH.ResendConfirmation)
@@ -151,6 +151,7 @@ func registerRoutes(
 	protected.GET("/users/:id", userH.GetUser)
 	protected.PATCH("/users/:id", userH.UpdateUser)
 	protected.DELETE("/users/:id", userH.DeleteUser)
+	protected.POST("/users/logout", userH.Logout)
 
 	// --- WebSocket ---
 	ws := e.Group("/ws")

@@ -16,6 +16,7 @@ type UserService interface {
 	GetUser(requester *entity.User, rawId string) (*contract.UserResponse, apierror.ErrorResponse)
 	UpdateUser(requester *entity.User, targetId string, req *contract.UpdateUserRequest) (*contract.UserResponse, apierror.ErrorResponse)
 	DeleteUser(requester *entity.User, targetId string) apierror.ErrorResponse
+	Logout(actor *entity.User, req *contract.LogoutRequest) apierror.ErrorResponse
 	CheckEmail(req *contract.UserStatusRequest) (*contract.EmailStatus, apierror.ErrorResponse)
 	CreateUser(req *contract.CreateUserRequest) apierror.ErrorResponse
 	Login(req *contract.UserLoginRequest) (*contract.UserLoginResponse, apierror.ErrorResponse)
@@ -95,6 +96,24 @@ func (u *DefaultUserRoute) DeleteUser(c echo.Context) error {
 	}
 
 	apierr := u.UserService.DeleteUser(user, targetId)
+	if apierr != nil {
+		return c.JSON(apierr.Code(), apierr)
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+func (u *DefaultUserRoute) Logout(c echo.Context) error {
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
+	var req contract.LogoutRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, apierror.MalformedBodyError)
+	}
+
+	apierr := u.UserService.Logout(user, &req)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}

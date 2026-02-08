@@ -138,6 +138,22 @@ func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierro
 	return nil
 }
 
+func (u *UserService) Logout(actor *entity.User, req *contract.LogoutRequest) apierror.ErrorResponse {
+	utils.Sanitize(req)
+	if err := u.Validate.Struct(req); err != nil {
+		return apierror.FromValidationError(err)
+	}
+
+	err := u.Cognito.GlobalSignOut(req.AccessToken)
+	if err != nil {
+		log.Errorf("failed to logout: %v", err)
+		return apierror.InternalServerError
+	}
+
+	u.dispatchLogoutEvent(actor.ID)
+	return nil
+}
+
 func (u *UserService) CheckEmail(req *contract.UserStatusRequest) (*contract.EmailStatus, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
@@ -366,6 +382,12 @@ func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserRes
 
 func (u *UserService) dispatchUserDeleteEvent(userID int) {
 	u.WSService.TerminateUserConnections(context.Background(), userID, nil)
+}
+
+func (u *UserService) dispatchLogoutEvent(userID int) {
+	u.WSService.TerminateUserConnections(context.Background(), userID, &events.ConnectionKill{
+		Code: contract.CodeLogout,
+	})
 }
 
 func handleUserSignup(cogClient cognitoclient.Client, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
