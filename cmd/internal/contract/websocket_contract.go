@@ -21,6 +21,7 @@ type KillCode string
 const (
 	CodeSuspendedAccount KillCode = "SUSPENDED_ACCOUNT"
 	CodeIdleTimeout      KillCode = "IDLE_TIMEOUT"
+	CodeLogout           KillCode = "LOGOUT"
 )
 
 // IncomingSocketMessage is used for messages we receive from the users.
