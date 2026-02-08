@@ -35,11 +35,13 @@ func NewWebSocketService(repo ConnectionRepository, gateway websocket.GatewayCli
 }
 
 func (s *WebSocketService) RegisterConnection(userID int, connectionID string, exp int64) apierror.ErrorResponse {
+	now := utils.NowUTC()
 	conn := &entity.Connection{
-		ConnectionID: connectionID,
-		UserID:       userID,
-		ExpiresAt:    exp * 1000, // "exp" is stored in seconds, our app uses millis
-		CreatedAt:    utils.NowUTC(),
+		ConnectionID:    connectionID,
+		UserID:          userID,
+		ExpiresAt:       exp * 1000, // "exp" is stored in seconds, our app uses millis
+		LastHeartbeatAt: now,        // Avoid users getting disconnected immediately
+		CreatedAt:       utils.NowUTC(),
 	}
 
 	if err := s.ConnRepo.Save(conn); err != nil {
