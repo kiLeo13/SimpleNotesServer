@@ -168,13 +168,13 @@ func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteReque
 }
 
 func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
+	if !actor.Permissions.HasEffective(entity.PermissionEditNotes) {
+		return nil, apierror.UserMissingPermsError
+	}
+
 	utils.Sanitize(req)
 	if valerr := n.Validate.Struct(req); valerr != nil {
 		return nil, apierror.FromValidationError(valerr)
-	}
-
-	if !actor.Permissions.HasEffective(entity.PermissionEditNotes) {
-		return nil, apierror.UserMissingPermsError
 	}
 
 	note, err := n.NoteRepo.FindByID(noteId)
