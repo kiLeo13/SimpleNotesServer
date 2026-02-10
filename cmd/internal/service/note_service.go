@@ -27,7 +27,7 @@ type NoteRepository interface {
 	Delete(note *entity.Note) error
 }
 
-type DefaultNoteService struct {
+type NoteService struct {
 	NoteRepo  NoteRepository
 	UserRepo  UserRepository
 	WSService *WebSocketService
@@ -41,8 +41,8 @@ func NewNoteService(
 	wsService *WebSocketService,
 	s3 storage.S3Client,
 	validate *validator.Validate,
-) *DefaultNoteService {
-	return &DefaultNoteService{
+) *NoteService {
+	return &NoteService{
 		NoteRepo:  noteRepo,
 		UserRepo:  userRepo,
 		WSService: wsService,
@@ -51,7 +51,7 @@ func NewNoteService(
 	}
 }
 
-func (n *DefaultNoteService) GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse) {
+func (n *NoteService) GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse) {
 	notes, err := n.NoteRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
@@ -65,7 +65,7 @@ func (n *DefaultNoteService) GetAllNotes() ([]*contract.NoteResponse, apierror.E
 	return resp, nil
 }
 
-func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*contract.NoteResponse, apierror.ErrorResponse) {
+func (n *NoteService) GetNoteByID(actor *entity.User, noteId int) (*contract.NoteResponse, apierror.ErrorResponse) {
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
@@ -78,7 +78,7 @@ func (n *DefaultNoteService) GetNoteByID(actor *entity.User, noteId int) (*contr
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
+func (n *NoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
 	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
@@ -114,7 +114,7 @@ func (n *DefaultNoteService) CreateTextNote(actor *entity.User, req *contract.Te
 	return toNoteResponse(note, true), nil
 }
 
-func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *contract.NoteRequest, fileHeader *multipart.FileHeader) (*contract.NoteResponse, apierror.ErrorResponse) {
+func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteRequest, fileHeader *multipart.FileHeader) (*contract.NoteResponse, apierror.ErrorResponse) {
 	if !actor.Permissions.HasEffective(entity.PermissionCreateNotes) {
 		return nil, apierror.UserMissingPermsError
 	}
@@ -157,7 +157,7 @@ func (n *DefaultNoteService) CreateFileNote(actor *entity.User, req *contract.No
 	return resp, nil
 }
 
-func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
+func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
 	utils.Sanitize(req)
 	if valerr := n.Validate.Struct(req); valerr != nil {
 		return nil, apierror.FromValidationError(valerr)
@@ -201,7 +201,7 @@ func (n *DefaultNoteService) UpdateNote(actor *entity.User, noteId int, req *con
 	return resp, nil
 }
 
-func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse {
+func (n *NoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse {
 	if !actor.Permissions.HasEffective(entity.PermissionDeleteNotes) {
 		return apierror.UserMissingPermsError
 	}
@@ -232,19 +232,19 @@ func (n *DefaultNoteService) DeleteNote(actor *entity.User, noteId int) apierror
 	return nil
 }
 
-func (n *DefaultNoteService) dispatchNoteCreateEvent(note *contract.NoteResponse) {
+func (n *NoteService) dispatchNoteCreateEvent(note *contract.NoteResponse) {
 	n.WSService.Broadcast(context.Background(), &events.NoteCreated{
 		NoteResponse: note,
 	})
 }
 
-func (n *DefaultNoteService) dispatchNoteUpdateEvent(note *contract.NoteResponse) {
+func (n *NoteService) dispatchNoteUpdateEvent(note *contract.NoteResponse) {
 	n.WSService.Broadcast(context.Background(), &events.NoteUpdated{
 		NoteResponse: note,
 	})
 }
 
-func (n *DefaultNoteService) dispatchNoteDeleteEvent(noteID int) {
+func (n *NoteService) dispatchNoteDeleteEvent(noteID int) {
 	n.WSService.Broadcast(context.Background(), &events.NoteDeleted{
 		NoteID: noteID,
 	})
