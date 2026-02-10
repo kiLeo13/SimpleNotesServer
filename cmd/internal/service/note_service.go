@@ -14,6 +14,7 @@ import (
 	"simplenotes/cmd/internal/contract"
 	"simplenotes/cmd/internal/domain/entity"
 	"simplenotes/cmd/internal/domain/events"
+	"simplenotes/cmd/internal/domain/policy"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
@@ -21,18 +22,19 @@ import (
 )
 
 type NoteRepository interface {
-	FindAll() ([]*entity.Note, error)
+	FindAll(withPrivate bool) ([]*entity.Note, error)
 	FindByID(id int) (*entity.Note, error)
 	Save(note *entity.Note) error
 	Delete(note *entity.Note) error
 }
 
 type NoteService struct {
-	NoteRepo  NoteRepository
-	UserRepo  UserRepository
-	WSService *WebSocketService
-	S3        storage.S3Client
-	Validate  *validator.Validate
+	NoteRepo   NoteRepository
+	UserRepo   UserRepository
+	WSService  *WebSocketService
+	S3         storage.S3Client
+	Validate   *validator.Validate
+	NotePolicy *policy.NotePolicy
 }
 
 func NewNoteService(
@@ -41,18 +43,21 @@ func NewNoteService(
 	wsService *WebSocketService,
 	s3 storage.S3Client,
 	validate *validator.Validate,
+	notePolicy *policy.NotePolicy,
 ) *NoteService {
 	return &NoteService{
-		NoteRepo:  noteRepo,
-		UserRepo:  userRepo,
-		WSService: wsService,
-		S3:        s3,
-		Validate:  validate,
+		NoteRepo:   noteRepo,
+		UserRepo:   userRepo,
+		WSService:  wsService,
+		S3:         s3,
+		Validate:   validate,
+		NotePolicy: notePolicy,
 	}
 }
 
-func (n *NoteService) GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse) {
-	notes, err := n.NoteRepo.FindAll()
+func (n *NoteService) GetAllNotes(actor *entity.User) ([]*contract.NoteResponse, apierror.ErrorResponse) {
+	canSeeHidden := actor.Permissions.HasEffective(entity.PermissionSeeHiddenNotes)
+	notes, err := n.NoteRepo.FindAll(canSeeHidden)
 	if err != nil {
 		log.Errorf("failed to fetch notes: %v", err)
 		return nil, apierror.InternalServerError
@@ -70,6 +75,11 @@ func (n *NoteService) GetNoteByID(actor *entity.User, noteId int) (*contract.Not
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
 		return nil, apierror.InternalServerError
+	}
+
+	apierr := n.NotePolicy.CanSee(note, actor)
+	if apierr != nil {
+		return nil, apierr
 	}
 
 	if note == nil {
@@ -98,7 +108,7 @@ func (n *NoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteR
 		Tags:        strings.ToLower(tags),
 		NoteType:    entity.NoteType(req.NoteType),
 		ContentSize: len(req.Content),
-		Visibility:  req.Visibility,
+		Visibility:  entity.NoteVisibility(req.Visibility),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -142,7 +152,7 @@ func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteReque
 		Tags:        strings.ToLower(tags),
 		NoteType:    entity.NoteTypeReference,
 		ContentSize: fileLength,
-		Visibility:  req.Visibility,
+		Visibility:  entity.NoteVisibility(req.Visibility),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -183,7 +193,7 @@ func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.U
 		note.Name = *req.Name
 	}
 	if req.Visibility != nil {
-		note.Visibility = *req.Visibility
+		note.Visibility = entity.NoteVisibility(*req.Visibility)
 	}
 	if req.Tags != nil {
 		note.Tags = strings.ToLower(tags)
@@ -310,7 +320,7 @@ func toNoteResponse(note *entity.Note, forceContent bool) *contract.NoteResponse
 		Name:        note.Name,
 		Content:     content,
 		Tags:        toTagsArray(note.Tags),
-		Visibility:  note.Visibility,
+		Visibility:  string(note.Visibility),
 		NoteType:    string(note.NoteType),
 		ContentSize: note.ContentSize,
 		CreatedByID: note.CreatedByID,

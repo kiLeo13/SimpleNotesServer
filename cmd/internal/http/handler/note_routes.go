@@ -17,7 +17,7 @@ import (
 // NoteService interface updated to accept *entity.User instead of strings.
 // This allows the service to check permissions without hitting the DB again.
 type NoteService interface {
-	GetAllNotes() ([]*contract.NoteResponse, apierror.ErrorResponse)
+	GetAllNotes(actor *entity.User) ([]*contract.NoteResponse, apierror.ErrorResponse)
 	GetNoteByID(actor *entity.User, noteId int) (*contract.NoteResponse, apierror.ErrorResponse)
 	CreateTextNote(actor *entity.User, req *contract.TextNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse)
 	CreateFileNote(actor *entity.User, req *contract.NoteRequest, fileHeader *multipart.FileHeader) (*contract.NoteResponse, apierror.ErrorResponse)
@@ -34,7 +34,12 @@ func NewNoteDefault(noteService NoteService) *DefaultNoteRoute {
 }
 
 func (n *DefaultNoteRoute) GetNotes(c echo.Context) error {
-	notes, err := n.NoteService.GetAllNotes()
+	user, cerr := utils.GetUserFromContext(c)
+	if cerr != nil {
+		return c.JSON(cerr.Code(), cerr)
+	}
+
+	notes, err := n.NoteService.GetAllNotes(user)
 	if err != nil {
 		return c.JSON(err.Code(), err)
 	}

@@ -74,6 +74,7 @@ func main() {
 
 	// Domain & Service Wiring
 	userPolicy := policy.NewUserPolicy()
+	notePolicy := policy.NewNotePolicy()
 
 	connRepo := repository.NewConnectionRepository(db)
 	noteRepo := repository.NewNoteRepository(db)
@@ -81,7 +82,7 @@ func main() {
 
 	connService := service.NewWebSocketService(connRepo, wsClient)
 	userService := service.NewUserService(userRepo, validate, connService, cogClient, userPolicy)
-	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate)
+	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate, notePolicy)
 
 	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)
