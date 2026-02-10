@@ -19,7 +19,7 @@ type NoteResponse struct {
 
 type NoteRequest struct {
 	Name       string   `json:"name" validate:"required,min=2,max=80"`
-	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
+	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC ORGANIZATION PRIVATE"`
 	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
 
@@ -27,12 +27,12 @@ type TextNoteRequest struct {
 	Name       string   `json:"name" validate:"required,min=2,max=80"`
 	Content    string   `json:"content" validate:"required,max=1000000"`
 	NoteType   string   `json:"note_type" validate:"required,oneof=MARKDOWN FLOWCHART"`
-	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC CONFIDENTIAL"`
+	Visibility string   `json:"visibility" validate:"required,oneof=PUBLIC ORGANIZATION PRIVATE"`
 	Tags       []string `json:"tags" validate:"required,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
 
 type UpdateNoteRequest struct {
 	Name       *string  `form:"name" validate:"omitempty,min=2,max=80"`
-	Visibility *string  `form:"visibility" validate:"omitempty,oneof=PUBLIC CONFIDENTIAL"`
+	Visibility *string  `form:"visibility" validate:"omitempty,oneof=PUBLIC ORGANIZATION PRIVATE"`
 	Tags       []string `form:"tags" validate:"omitempty,max=50,nodupes,dive,required,min=2,max=30,nospaces"`
 }
