@@ -81,10 +81,6 @@ func (n *NoteService) GetNoteByID(actor *entity.User, noteId int) (*contract.Not
 	if apierr != nil {
 		return nil, apierr
 	}
-
-	if note == nil {
-		return nil, apierror.NotFoundError
-	}
 	return toNoteResponse(note, true), nil
 }
 
@@ -168,23 +164,20 @@ func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteReque
 }
 
 func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.UpdateNoteRequest) (*contract.NoteResponse, apierror.ErrorResponse) {
-	if !actor.Permissions.HasEffective(entity.PermissionEditNotes) {
-		return nil, apierror.UserMissingPermsError
-	}
-
-	utils.Sanitize(req)
-	if valerr := n.Validate.Struct(req); valerr != nil {
-		return nil, apierror.FromValidationError(valerr)
-	}
-
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
 		return nil, apierror.InternalServerError
 	}
 
-	if note == nil {
-		return nil, apierror.NotFoundError
+	apierr := n.NotePolicy.CanSee(note, actor)
+	if apierr != nil {
+		return nil, apierr
+	}
+
+	utils.Sanitize(req)
+	if valerr := n.Validate.Struct(req); valerr != nil {
+		return nil, apierror.FromValidationError(valerr)
 	}
 
 	// Now, we can finally PATCH our data :D
@@ -212,18 +205,15 @@ func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.U
 }
 
 func (n *NoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorResponse {
-	if !actor.Permissions.HasEffective(entity.PermissionDeleteNotes) {
-		return apierror.UserMissingPermsError
-	}
-
 	note, err := n.NoteRepo.FindByID(noteId)
 	if err != nil {
 		log.Errorf("failed to fetch note: %v", err)
 		return apierror.InternalServerError
 	}
 
-	if note == nil {
-		return apierror.NotFoundError
+	apierr := n.NotePolicy.CanUpdate(note, actor)
+	if apierr != nil {
+		return apierr
 	}
 
 	err = deleteBucketObject(n.S3, note)
