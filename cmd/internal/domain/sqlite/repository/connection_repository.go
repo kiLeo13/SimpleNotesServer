@@ -55,6 +55,22 @@ func (c *DefaultConnectionRepository) FindAll() ([]*entity.Connection, error) {
 	return conns, nil
 }
 
+func (c *DefaultConnectionRepository) FetchIn(userIDs ...int) ([]*entity.Connection, error) {
+	var conns []*entity.Connection
+	if len(userIDs) == 0 {
+		return conns, nil
+	}
+
+	err := c.db.
+		Where("user_id IN ?", userIDs).
+		Find(&conns).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return conns, nil
+}
+
 func (c *DefaultConnectionRepository) FindStale(now int64, heartbeatThreshold int64) ([]*entity.Connection, error) {
 	var conns []*entity.Connection
 	err := c.db.Where("expires_at < ?", now).

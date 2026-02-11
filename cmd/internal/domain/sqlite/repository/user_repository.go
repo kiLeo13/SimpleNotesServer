@@ -103,6 +103,20 @@ func (u *DefaultUserRepository) SoftDelete(user *entity.User) error {
 	}).Error
 }
 
+func (u *DefaultUserRepository) FetchAllActiveOnline() ([]*entity.User, error) {
+	var users []*entity.User
+	err := u.db.Table("users").
+		Joins("INNER JOIN connections ON connections.user_id = users.id").
+		Where("users.active = ?", true).
+		Distinct("users.*").
+		Find(&users).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (u *DefaultUserRepository) Save(user *entity.User) error {
 	return u.db.Save(user).Error
 }
