@@ -170,7 +170,7 @@ func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.U
 		return nil, apierror.InternalServerError
 	}
 
-	apierr := n.NotePolicy.CanSee(note, actor)
+	apierr := n.NotePolicy.CanUpdate(note, actor)
 	if apierr != nil {
 		return nil, apierr
 	}
@@ -211,7 +211,7 @@ func (n *NoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorR
 		return apierror.InternalServerError
 	}
 
-	apierr := n.NotePolicy.CanUpdate(note, actor)
+	apierr := n.NotePolicy.CanDelete(note, actor)
 	if apierr != nil {
 		return apierr
 	}
