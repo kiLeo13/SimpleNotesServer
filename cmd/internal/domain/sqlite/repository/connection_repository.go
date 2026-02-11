@@ -38,10 +38,21 @@ func (c *DefaultConnectionRepository) FindByUserID(userID int) ([]string, error)
 	return ids, nil
 }
 
-func (c *DefaultConnectionRepository) FindAll() ([]string, error) {
+func (c *DefaultConnectionRepository) FindAllConnIDs() ([]string, error) {
 	var ids []string
-	result := c.db.Model(&entity.Connection{}).Pluck("connection_id", &ids)
+	result := c.db.
+		Model(&entity.Connection{}).
+		Pluck("connection_id", &ids)
 	return ids, result.Error
+}
+
+func (c *DefaultConnectionRepository) FindAll() ([]*entity.Connection, error) {
+	var conns []*entity.Connection
+	result := c.db.Find(&conns)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return conns, nil
 }
 
 func (c *DefaultConnectionRepository) FindStale(now int64, heartbeatThreshold int64) ([]*entity.Connection, error) {
