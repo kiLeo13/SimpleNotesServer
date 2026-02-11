@@ -17,7 +17,8 @@ type ConnectionRepository interface {
 	Save(conn *entity.Connection) error
 	Delete(connID string) error
 	FindByUserID(userID int) ([]string, error)
-	FindAll() ([]string, error)
+	FindAll() ([]*entity.Connection, error)
+	FindAllConnIDs() ([]string, error)
 	FindStale(now int64, hbLimit int64) ([]*entity.Connection, error)
 	UpdateHeartbeat(connID string, now int64) error
 }
@@ -114,7 +115,7 @@ func (s *WebSocketService) DispatchToConnection(ctx context.Context, connID stri
 // Broadcast sends an event to ALL connected users.
 // This iterates through every active connection in the DB.
 func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent) {
-	conns, err := s.ConnRepo.FindAll()
+	conns, err := s.ConnRepo.FindAllConnIDs()
 	if err != nil {
 		log.Errorf("failed to fetch all connections for broadcast: %v", err)
 		return
@@ -127,6 +128,28 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 
 	for _, connID := range conns {
 		_ = s.Gateway.PostToConnection(ctx, connID, envelope)
+	}
+}
+
+// BroadcastSupplier broadcasts the returned socket event to the current user.
+// If the supplier returns `nil`, then no event is sent.
+func (s *WebSocketService) BroadcastSupplier(ctx context.Context, supplier func(userID int) events.SocketEvent) {
+	conns, err := s.ConnRepo.FindAll()
+	if err != nil {
+		log.Errorf("failed to fetch all connections for broadcast: %v", err)
+		return
+	}
+
+	for _, conn := range conns {
+		evt := supplier(conn.UserID)
+		if evt == nil {
+			continue
+		}
+		envelope := &contract.OutgoingSocketMessage{
+			Type: evt.GetType(),
+			Data: evt,
+		}
+		_ = s.Gateway.PostToConnection(ctx, conn.ConnectionID, envelope)
 	}
 }
 
