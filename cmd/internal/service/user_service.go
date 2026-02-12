@@ -9,7 +9,6 @@ import (
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
-	"simplenotes/cmd/internal/utils/uid"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
@@ -205,7 +204,6 @@ func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.Error
 
 	now := utils.NowUTC()
 	user := &entity.User{
-		ID:            uid.Generate(),
 		SubUUID:       uuid,
 		Username:      req.Username,
 		Email:         req.Email,
@@ -370,7 +368,7 @@ func (u *UserService) fetchByID(rawId string, force bool) (*entity.User, apierro
 	return user, nil
 }
 
-func (u *UserService) dispatchUserUpdateEvent(destID int64, user *contract.UserResponse) {
+func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserResponse) {
 	u.WSService.Dispatch(context.Background(), destID, &events.UserUpdated{
 		UserResponse: user,
 	})
@@ -382,11 +380,11 @@ func (u *UserService) dispatchUserUpdateEvent(destID int64, user *contract.UserR
 	}
 }
 
-func (u *UserService) dispatchUserDeleteEvent(userID int64) {
+func (u *UserService) dispatchUserDeleteEvent(userID int) {
 	u.WSService.TerminateUserConnections(context.Background(), userID, nil)
 }
 
-func (u *UserService) dispatchLogoutEvent(userID int64) {
+func (u *UserService) dispatchLogoutEvent(userID int) {
 	u.WSService.TerminateUserConnections(context.Background(), userID, &events.ConnectionKill{
 		Code: contract.CodeLogout,
 	})

@@ -12,7 +12,7 @@ import (
 )
 
 type WebSocketService interface {
-	RegisterConnection(userID int64, connID string, exp int64) apierror.ErrorResponse
+	RegisterConnection(userID int, connID string, exp int64) apierror.ErrorResponse
 	RemoveConnection(connectionID string)
 	HandleMessage(msg *contract.IncomingSocketMessage, connID string)
 }

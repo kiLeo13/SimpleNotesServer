@@ -14,7 +14,6 @@ import (
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/service/jobs"
 	"simplenotes/cmd/internal/utils"
-	"simplenotes/cmd/internal/utils/uid"
 	"simplenotes/cmd/internal/utils/validators"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -46,9 +45,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Snowflakes init
-	uid.Init(1)
 
 	// --- Cognito/Auth Init ---
 	appClientID := os.Getenv("AWS_COGNITO_CLIENT_ID")

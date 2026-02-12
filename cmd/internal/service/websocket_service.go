@@ -16,7 +16,7 @@ import (
 type ConnectionRepository interface {
 	Save(conn *entity.Connection) error
 	Delete(connID string) error
-	FindByUserID(userID int64) ([]string, error)
+	FindByUserID(userID int) ([]string, error)
 	FindAll() ([]*entity.Connection, error)
 	FindAllConnIDs() ([]string, error)
 	FindStale(now int64, hbLimit int64) ([]*entity.Connection, error)
@@ -35,7 +35,7 @@ func NewWebSocketService(repo ConnectionRepository, gateway websocket.GatewayCli
 	}
 }
 
-func (s *WebSocketService) RegisterConnection(userID int64, connectionID string, exp int64) apierror.ErrorResponse {
+func (s *WebSocketService) RegisterConnection(userID int, connectionID string, exp int64) apierror.ErrorResponse {
 	now := utils.NowUTC()
 	conn := &entity.Connection{
 		ConnectionID:    connectionID,
@@ -64,7 +64,7 @@ func (s *WebSocketService) HandleMessage(msg *contract.IncomingSocketMessage, co
 	}
 }
 
-func (s *WebSocketService) PushToUser(ctx context.Context, userID int64, payload interface{}) {
+func (s *WebSocketService) PushToUser(ctx context.Context, userID int, payload interface{}) {
 	conns, err := s.ConnRepo.FindByUserID(userID)
 	if err != nil {
 		log.Errorf("failed to fetch connections for user %d: %v", userID, err)
@@ -78,7 +78,7 @@ func (s *WebSocketService) PushToUser(ctx context.Context, userID int64, payload
 }
 
 // TerminateUserConnections sends a "poison pill" message and then disconnects
-func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int64, ck *events.ConnectionKill) {
+func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID int, ck *events.ConnectionKill) {
 	conns, _ := s.ConnRepo.FindByUserID(userID)
 	msg := contract.OutgoingSocketMessage{
 		Type: contract.EventConnectionKill,
@@ -96,7 +96,7 @@ func (s *WebSocketService) TerminateUserConnections(ctx context.Context, userID 
 	}
 }
 
-func (s *WebSocketService) Dispatch(ctx context.Context, userID int64, evt events.SocketEvent) {
+func (s *WebSocketService) Dispatch(ctx context.Context, userID int, evt events.SocketEvent) {
 	envelope := &contract.OutgoingSocketMessage{
 		Type: evt.GetType(),
 		Data: evt,
@@ -133,7 +133,7 @@ func (s *WebSocketService) Broadcast(ctx context.Context, evt events.SocketEvent
 
 // BroadcastSupplier broadcasts the returned socket event to the current user.
 // If the supplier returns `nil`, then no event is sent.
-func (s *WebSocketService) BroadcastSupplier(ctx context.Context, supplier func(userID int64) events.SocketEvent) {
+func (s *WebSocketService) BroadcastSupplier(ctx context.Context, supplier func(userID int) events.SocketEvent) {
 	conns, err := s.ConnRepo.FindAll()
 	if err != nil {
 		log.Errorf("failed to fetch all connections for broadcast: %v", err)

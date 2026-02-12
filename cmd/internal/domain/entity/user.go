@@ -2,7 +2,7 @@ package entity
 
 // User is the general basic structure of all users across the platform
 type User struct {
-	ID            int64      `gorm:"primaryKey"`
+	ID            int        `gorm:"primaryKey"`
 	SubUUID       string     `gorm:"not null"`
 	Username      string     `gorm:"not null"`
 	Email         string     `gorm:"not null"`

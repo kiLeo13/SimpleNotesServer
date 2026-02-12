@@ -25,7 +25,7 @@ func (c *DefaultConnectionRepository) Delete(connID string) error {
 	return result.Error
 }
 
-func (c *DefaultConnectionRepository) FindByUserID(userID int64) ([]string, error) {
+func (c *DefaultConnectionRepository) FindByUserID(userID int) ([]string, error) {
 	var ids []string
 	result := c.db.Model(&entity.Connection{}).
 		Where("user_id = ?", userID).
@@ -55,7 +55,7 @@ func (c *DefaultConnectionRepository) FindAll() ([]*entity.Connection, error) {
 	return conns, nil
 }
 
-func (c *DefaultConnectionRepository) FetchIn(userIDs ...int64) ([]*entity.Connection, error) {
+func (c *DefaultConnectionRepository) FetchIn(userIDs ...int) ([]*entity.Connection, error) {
 	var conns []*entity.Connection
 	if len(userIDs) == 0 {
 		return conns, nil
