@@ -17,10 +17,10 @@ const (
 )
 
 type Note struct {
-	ID          int            `gorm:"primaryKey"`
+	ID          int64          `gorm:"primaryKey"`
 	Name        string         `gorm:"not null"`
 	Content     string         `gorm:"not null"`
-	CreatedByID int            `gorm:"not null"` // References: users(id)
+	CreatedByID int64          `gorm:"not null"` // References: users(id)
 	Tags        string         `gorm:"not null"`
 	NoteType    NoteType       `gorm:"not null"`
 	ContentSize int            `gorm:"not null"`

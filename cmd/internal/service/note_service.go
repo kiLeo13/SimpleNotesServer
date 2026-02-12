@@ -18,6 +18,7 @@ import (
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
+	"simplenotes/cmd/internal/utils/uid"
 	"strings"
 )
 
@@ -98,6 +99,7 @@ func (n *NoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteR
 	now := utils.NowUTC()
 
 	note := &entity.Note{
+		ID:          uid.Generate(),
 		Name:        req.Name,
 		Content:     req.Content,
 		CreatedByID: actor.ID,
@@ -142,6 +144,7 @@ func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteReque
 	tags := strings.Join(req.Tags, " ")
 	now := utils.NowUTC()
 	note := &entity.Note{
+		ID:          uid.Generate(),
 		Name:        req.Name,
 		Content:     filename,
 		CreatedByID: actor.ID,
@@ -244,7 +247,7 @@ func (n *NoteService) dispatchNoteUpdateEvent(note *contract.NoteResponse) {
 	})
 }
 
-func (n *NoteService) dispatchNoteDeleteEvent(noteID int) {
+func (n *NoteService) dispatchNoteDeleteEvent(noteID int64) {
 	n.WSService.Broadcast(context.Background(), &events.NoteDeleted{
 		NoteID: noteID,
 	})

@@ -5,14 +5,14 @@ const MaxNoteFileSizeBytes = 30 * 1024 * 1024
 var ValidNoteFileTypes = []string{"pdf", "png", "jpg", "jpeg", "jfif", "webp", "gif", "mp4", "mp3"}
 
 type NoteResponse struct {
-	ID          int      `json:"id"`
+	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
 	Content     string   `json:"content,omitempty"`
 	Tags        []string `json:"tags"`
 	Visibility  string   `json:"visibility"`
 	NoteType    string   `json:"note_type"`
 	ContentSize int      `json:"content_size"`
-	CreatedByID int      `json:"created_by_id"`
+	CreatedByID int64    `json:"created_by_id"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
 }

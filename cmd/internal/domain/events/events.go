@@ -38,7 +38,7 @@ func (e *NoteUpdated) GetType() contract.EventType {
 }
 
 type NoteDeleted struct {
-	NoteID int `json:"id"`
+	NoteID int64 `json:"id"`
 }
 
 func (e *NoteDeleted) GetType() contract.EventType {

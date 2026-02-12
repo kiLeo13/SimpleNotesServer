@@ -45,7 +45,7 @@ type UserStatusRequest struct {
 }
 
 type UserResponse struct {
-	ID         int    `json:"id"`
+	ID         int64  `json:"id"`
 	Username   string `json:"username"`
 	Perms      int64  `json:"permissions"`
 	IsVerified *bool  `json:"is_verified,omitempty"`
