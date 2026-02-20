@@ -11,6 +11,7 @@ import (
 	cognitoclient "simplenotes/cmd/internal/infrastructure/aws/cognito"
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/infrastructure/aws/websocket"
+	"simplenotes/cmd/internal/infrastructure/minhareceita"
 	"simplenotes/cmd/internal/service"
 	"simplenotes/cmd/internal/service/jobs"
 	"simplenotes/cmd/internal/utils"
@@ -72,6 +73,9 @@ func main() {
 		panic(err)
 	}
 
+	// Clients
+	receitaClient := minhareceita.NewClient()
+
 	// Domain & Service Wiring
 	userPolicy := policy.NewUserPolicy()
 	notePolicy := policy.NewNotePolicy()
@@ -79,22 +83,27 @@ func main() {
 	connRepo := repository.NewConnectionRepository(db)
 	noteRepo := repository.NewNoteRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	compRepo := repository.NewCompanyRepository(db)
 
 	connService := service.NewWebSocketService(connRepo, wsClient)
 	userService := service.NewUserService(userRepo, validate, connService, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate, notePolicy)
+	utilService := service.NewUtilService(receitaClient, compRepo)
 
 	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)
 	userRoutes := handler.NewUserDefault(userService)
+	utilRoutes := handler.NewUtilRoute(utilService)
 
 	// --- Background Jobs ---
-	cleaner := jobs.NewConnectionCleaner(connService)
+	connCleaner := jobs.NewConnectionCleaner(connService)
+	companyCleaner := jobs.NewCompanyCacheCleaner(compRepo)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go cleaner.Start(ctx)
+	go connCleaner.Start(ctx)
+	go companyCleaner.Start(ctx)
 
 	// --- Middleware Setup ---
 	authMiddleware := mdlware.NewAuthMiddleware(&mdlware.AuthMiddlewareConfig{
@@ -109,7 +118,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// --- Register Routes ---
-	registerRoutes(e, noteRoutes, userRoutes, connRoutes, authMiddleware)
+	registerRoutes(e, noteRoutes, userRoutes, utilRoutes, connRoutes, authMiddleware)
 
 	if err = e.Start(":7070"); err != nil {
 		panic(err)
@@ -121,6 +130,7 @@ func registerRoutes(
 	e *echo.Echo,
 	noteH *handler.DefaultNoteRoute,
 	userH *handler.DefaultUserRoute,
+	utilH *handler.DefaultUtilRoute,
 	wsH *handler.DefaultWSRoute,
 	authMiddleware echo.MiddlewareFunc,
 ) {
@@ -153,6 +163,9 @@ func registerRoutes(
 	protected.PATCH("/users/:id", userH.UpdateUser)
 	protected.DELETE("/users/:id", userH.DeleteUser)
 	protected.POST("/users/logout", userH.Logout)
+
+	// Utils
+	protected.GET("/utils/cnpj/:cnpj", utilH.GetCompany)
 
 	// --- WebSocket ---
 	ws := e.Group("/ws")
