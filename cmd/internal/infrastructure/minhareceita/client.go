@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"simplenotes/cmd/internal/domain/entity"
 )
 
@@ -28,12 +27,12 @@ func NewClient() *Client {
 }
 
 func (c *Client) GetByCNPJ(ctx context.Context, cnpj string) (*entity.Company, error) {
-	req := http.Request{
-		Method: http.MethodGet,
-		URL: &url.URL{
-			RawPath: c.baseURL + cnpj,
-		},
+	fullUrl := c.baseURL + cnpj
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullUrl, nil)
+	if err != nil {
+		return nil, err
 	}
+
 	resp, err := c.httpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
