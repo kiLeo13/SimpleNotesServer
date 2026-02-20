@@ -45,6 +45,7 @@ func (u *UtilService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contra
 func (u *UtilService) findCompany(cnpj string) (*entity.Company, bool, apierror.ErrorResponse) {
 	cached, err := u.CompanyRepo.FindByCNPJ(cnpj)
 	if err != nil {
+		log.Errorf("failed to find company by cnpj %s: %v", cnpj, err)
 		return nil, false, apierror.InternalServerError
 	}
 
@@ -80,6 +81,7 @@ func (u *UtilService) fetchFromAPI(cnpj string) (*entity.Company, apierror.Error
 			u.cacheNegativeResult(cnpj)
 			return nil, apierror.NotFoundError
 		}
+		log.Errorf("failed to fetch company by cnpj %s: %v", cnpj, err)
 		return nil, apierror.InternalServerError
 	}
 
