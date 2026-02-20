@@ -51,6 +51,7 @@ var (
 	FormJSONRequiredError = NewSimple(400, "Form field `json_payload` is required")
 	EmptyPatchCallError   = NewSimple(400, "Empty PATCH request")
 	MissingNoteFileError  = NewSimple(400, "Content file is required")
+	InvalidCNPJError      = NewSimple(400, "Invalid CNPJ")
 	UserMissingPermsError = NewSimple(403, "Missing permissions")
 	MissingFileNameError  = NewSimple(400, "File name is required")
 	InvalidMediaTypeError = NewSimple(415, "Unsupported media type. Use application/json or multipart/form-data")
