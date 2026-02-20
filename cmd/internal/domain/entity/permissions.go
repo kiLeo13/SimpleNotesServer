@@ -42,6 +42,10 @@ const (
 	// PermissionPunishUsers allows suspending/banning accounts.
 	// Immunity: Administrators and users with PermissionManagePerms cannot be punished.
 	PermissionPunishUsers
+
+	// PermissionPerformLookup allows users to call endpoints outside the
+	// general platform scope. Like CNPJ/places/IP lookups.
+	PermissionPerformLookup
 )
 
 // Has checks if the permission bitmask contains ALL bits
