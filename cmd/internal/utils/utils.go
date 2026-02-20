@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"simplenotes/cmd/internal/utils/apierror"
 	"slices"
 	"strings"
@@ -22,6 +23,8 @@ var (
 	expiredCode   *types.ExpiredCodeException
 	invalidParam  *types.InvalidParameterException
 )
+
+var numericRegex = regexp.MustCompile(`^\d+$`)
 
 // FormatEpoch formats the provided UTC millis and returns the
 // formatted datetime in the ISO8601 Date/Time format.
@@ -101,6 +104,10 @@ func MapCognitoError(err error) apierror.ErrorResponse {
 		log.Errorf("unmapped cognito error: %v", err)
 		return apierror.InternalServerError
 	}
+}
+
+func IsOnlyNumbers(s string) bool {
+	return numericRegex.MatchString(s)
 }
 
 // Sanitize sanitizes the given struct and returns all strings
