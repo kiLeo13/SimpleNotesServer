@@ -11,7 +11,7 @@ const (
 )
 
 type Company struct {
-	CNPJ        string `gorm:"primaryKey;column:cncpj"`
+	CNPJ        string `gorm:"primaryKey;column:cnpj"`
 	LegalName   string
 	TradeName   string
 	LegalNature string
@@ -28,11 +28,11 @@ type Company struct {
 	CachedAt int64 `gorm:"autoUpdateTime:false"`
 
 	// Relationships
-	Partners []*CompanyPartner `gorm:"foreignKey:CompanyID;references:CNPJ"`
+	Partners []*CompanyPartner `gorm:"foreignKey:CompanyCNPJ;references:CNPJ"`
 }
 
 type CompanyPartner struct {
-	id          int    `gorm:"primaryKey"`
+	ID          int    `gorm:"primaryKey"`
 	CompanyCNPJ string `gorm:"index"`
 	Name        string
 	Role        string
