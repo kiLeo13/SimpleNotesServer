@@ -33,32 +33,34 @@ func (u *UtilService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contra
 		return nil, apierror.UserMissingPermsError
 	}
 
-	company, err := u.findCompany(cnpj)
+	company, fromCache, err := u.findCompany(cnpj)
 	if err != nil {
 		return nil, err
 	}
-	return toCompanyResp(company), nil
+	return toCompanyResp(company, fromCache), nil
 }
 
-func (u *UtilService) findCompany(cnpj string) (*entity.Company, apierror.ErrorResponse) {
+// findCompany is a utility function that will try to resolve the CNPJ into a company.
+// It returns the company, a boolean (true = cached, false = API fetch) and a possible error response.
+func (u *UtilService) findCompany(cnpj string) (*entity.Company, bool, apierror.ErrorResponse) {
 	cached, err := u.CompanyRepo.FindByCNPJ(cnpj)
 	if err != nil {
-		return nil, apierror.InternalServerError
+		return nil, false, apierror.InternalServerError
 	}
 
 	// If we have some kind of cache
 	if cached != nil {
 		if cached.Found {
-			return cached, nil
+			return cached, true, nil
 		} else {
-			return nil, apierror.NotFoundError
+			return nil, false, apierror.NotFoundError
 		}
 	}
 
 	// Cache miss
 	apiCompany, apierr := u.fetchFromAPI(cnpj)
 	if apierr != nil {
-		return nil, apierr
+		return nil, false, apierr
 	}
 
 	err = u.CompanyRepo.Save(apiCompany)
@@ -68,7 +70,7 @@ func (u *UtilService) findCompany(cnpj string) (*entity.Company, apierror.ErrorR
 		log.Errorf("failed to save company cache for CNPJ %s: %v", cnpj, err)
 	}
 
-	return apiCompany, nil
+	return apiCompany, false, nil
 }
 
 func (u *UtilService) fetchFromAPI(cnpj string) (*entity.Company, apierror.ErrorResponse) {
@@ -94,7 +96,7 @@ func (u *UtilService) cacheNegativeResult(cnpj string) {
 	_ = u.CompanyRepo.Save(emptyCompany)
 }
 
-func toCompanyResp(c *entity.Company) *contract.CompanyResponse {
+func toCompanyResp(c *entity.Company, cached bool) *contract.CompanyResponse {
 	return &contract.CompanyResponse{
 		CNPJ:        c.CNPJ,
 		LegalName:   c.LegalName,
@@ -102,6 +104,7 @@ func toCompanyResp(c *entity.Company) *contract.CompanyResponse {
 		LegalNature: c.LegalNature,
 		RegStatus:   string(c.RegStatus),
 		Partners:    toPartnersResponse(c.Partners),
+		Cached:      cached,
 	}
 }
 

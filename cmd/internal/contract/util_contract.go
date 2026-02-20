@@ -7,6 +7,7 @@ type CompanyResponse struct {
 	LegalNature string             `json:"legal_nature"`
 	RegStatus   string             `json:"registration_status"`
 	Partners    []*PartnerResponse `json:"qsa"`
+	Cached      bool               `json:"cached"`
 }
 
 type PartnerResponse struct {
