@@ -26,6 +26,7 @@ func Init() (*gorm.DB, error) {
 		&entity.User{},
 		&entity.Connection{},
 		&entity.Company{},
+		&entity.CompanyPartner{},
 	)
 	if err != nil {
 		return nil, err
