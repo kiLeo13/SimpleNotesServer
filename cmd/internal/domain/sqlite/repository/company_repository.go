@@ -17,7 +17,7 @@ func NewCompanyRepository(db *gorm.DB) *DefaultCompanyRepository {
 func (r *DefaultCompanyRepository) FindByCNPJ(cnpj string) (*entity.Company, error) {
 	var company entity.Company
 	err := r.db.
-		Preload("CompanyPartners").
+		Preload("Partners").
 		Where("cnpj = ?", cnpj).
 		First(&company).Error
 
