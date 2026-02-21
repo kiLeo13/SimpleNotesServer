@@ -10,19 +10,19 @@ import (
 	"strings"
 )
 
-type UtilService interface {
+type MiscService interface {
 	GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contract.CompanyResponse, apierror.ErrorResponse)
 }
 
-type DefaultUtilRoute struct {
-	UtilService UtilService
+type DefaultMiscRoute struct {
+	MiscService MiscService
 }
 
-func NewUtilRoute(utilService UtilService) *DefaultUtilRoute {
-	return &DefaultUtilRoute{UtilService: utilService}
+func NewMiscRoute(miscService MiscService) *DefaultMiscRoute {
+	return &DefaultMiscRoute{MiscService: miscService}
 }
 
-func (u *DefaultUtilRoute) GetCompany(c echo.Context) error {
+func (u *DefaultMiscRoute) GetCompany(c echo.Context) error {
 	user, cerr := utils.GetUserFromContext(c)
 	if cerr != nil {
 		return c.JSON(cerr.Code(), cerr)
@@ -34,7 +34,7 @@ func (u *DefaultUtilRoute) GetCompany(c echo.Context) error {
 		return c.JSON(apierr.Code(), apierr)
 	}
 
-	company, apierr := u.UtilService.GetCompanyByCNPJ(user, cnpj)
+	company, apierr := u.MiscService.GetCompanyByCNPJ(user, cnpj)
 	if apierr != nil {
 		return c.JSON(apierr.Code(), apierr)
 	}

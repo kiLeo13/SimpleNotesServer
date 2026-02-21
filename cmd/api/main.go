@@ -88,12 +88,12 @@ func main() {
 	connService := service.NewWebSocketService(connRepo, wsClient)
 	userService := service.NewUserService(userRepo, validate, connService, cogClient, userPolicy)
 	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate, notePolicy)
-	utilService := service.NewUtilService(receitaClient, compRepo)
+	miscService := service.NewMiscService(receitaClient, compRepo)
 
 	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)
 	userRoutes := handler.NewUserDefault(userService)
-	utilRoutes := handler.NewUtilRoute(utilService)
+	miscRoutes := handler.NewMiscRoute(miscService)
 
 	// --- Background Jobs ---
 	connCleaner := jobs.NewConnectionCleaner(connService)
@@ -118,7 +118,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// --- Register Routes ---
-	registerRoutes(e, noteRoutes, userRoutes, utilRoutes, connRoutes, authMiddleware)
+	registerRoutes(e, noteRoutes, userRoutes, miscRoutes, connRoutes, authMiddleware)
 
 	if err = e.Start(":7070"); err != nil {
 		panic(err)
@@ -130,7 +130,7 @@ func registerRoutes(
 	e *echo.Echo,
 	noteH *handler.DefaultNoteRoute,
 	userH *handler.DefaultUserRoute,
-	utilH *handler.DefaultUtilRoute,
+	miscH *handler.DefaultMiscRoute,
 	wsH *handler.DefaultWSRoute,
 	authMiddleware echo.MiddlewareFunc,
 ) {
@@ -164,8 +164,8 @@ func registerRoutes(
 	protected.DELETE("/users/:id", userH.DeleteUser)
 	protected.POST("/users/logout", userH.Logout)
 
-	// Utils
-	protected.GET("/utils/cnpj/:cnpj", utilH.GetCompany)
+	// Misc
+	protected.GET("/misc/cnpj/:cnpj", miscH.GetCompany)
 
 	// --- WebSocket ---
 	ws := e.Group("/ws")

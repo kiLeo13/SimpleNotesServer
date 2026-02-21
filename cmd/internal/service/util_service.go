@@ -16,19 +16,19 @@ type CompanyRepository interface {
 	FindByCNPJ(cnpj string) (*entity.Company, error)
 }
 
-type UtilService struct {
+type MiscService struct {
 	ReceitaClient *minhareceita.Client
 	CompanyRepo   CompanyRepository
 }
 
-func NewUtilService(client *minhareceita.Client, companyRepo CompanyRepository) *UtilService {
-	return &UtilService{
+func NewMiscService(client *minhareceita.Client, companyRepo CompanyRepository) *MiscService {
+	return &MiscService{
 		ReceitaClient: client,
 		CompanyRepo:   companyRepo,
 	}
 }
 
-func (u *UtilService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contract.CompanyResponse, apierror.ErrorResponse) {
+func (u *MiscService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contract.CompanyResponse, apierror.ErrorResponse) {
 	if !actor.Permissions.HasEffective(entity.PermissionPerformLookup) {
 		return nil, apierror.UserMissingPermsError
 	}
@@ -42,7 +42,7 @@ func (u *UtilService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contra
 
 // findCompany is a utility function that will try to resolve the CNPJ into a company.
 // It returns the company, a boolean (true = cached, false = API fetch) and a possible error response.
-func (u *UtilService) findCompany(cnpj string) (*entity.Company, bool, apierror.ErrorResponse) {
+func (u *MiscService) findCompany(cnpj string) (*entity.Company, bool, apierror.ErrorResponse) {
 	cached, err := u.CompanyRepo.FindByCNPJ(cnpj)
 	if err != nil {
 		log.Errorf("failed to find company by cnpj %s: %v", cnpj, err)
@@ -74,7 +74,7 @@ func (u *UtilService) findCompany(cnpj string) (*entity.Company, bool, apierror.
 	return apiCompany, false, nil
 }
 
-func (u *UtilService) fetchFromAPI(cnpj string) (*entity.Company, apierror.ErrorResponse) {
+func (u *MiscService) fetchFromAPI(cnpj string) (*entity.Company, apierror.ErrorResponse) {
 	company, err := u.ReceitaClient.GetByCNPJ(context.Background(), cnpj)
 	if err != nil {
 		if errors.Is(err, minhareceita.ErrNotFound) {
@@ -90,7 +90,7 @@ func (u *UtilService) fetchFromAPI(cnpj string) (*entity.Company, apierror.Error
 	return company, nil
 }
 
-func (u *UtilService) cacheNegativeResult(cnpj string) {
+func (u *MiscService) cacheNegativeResult(cnpj string) {
 	emptyCompany := &entity.Company{
 		CNPJ:  cnpj,
 		Found: false,
