@@ -25,6 +25,7 @@ type Company struct {
 	AddressStreetName   string
 	AddressNumber       string
 	AddressNeighborhood string
+	AddressZipCode      string
 	AddressCity         string
 
 	// Found controls the negative caching strategy for external API lookups:

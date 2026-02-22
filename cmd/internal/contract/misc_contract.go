@@ -25,6 +25,7 @@ type CompanyAddress struct {
 	StreetName   string `json:"street_name"`
 	Number       string `json:"number"`
 	Neighborhood string `json:"neighborhood"`
+	ZipCode      string `json:"zip_code"`
 	City         string `json:"city"`
 }
 
