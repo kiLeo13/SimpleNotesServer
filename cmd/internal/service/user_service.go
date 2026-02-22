@@ -109,9 +109,10 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 			log.Errorf("actor %s failed to update user %s: %v", actor.SubUUID, targetId, err)
 			return nil, apierror.InternalServerError
 		}
-		resp = toUserResponse(target, actor)
-		u.dispatchUserUpdateEvent(target.ID, resp)
 	}
+
+	resp = toUserResponse(target, actor)
+	u.dispatchUserUpdateEvent(target.ID, resp)
 	return resp, nil
 }
 
