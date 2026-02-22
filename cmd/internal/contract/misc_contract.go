@@ -27,6 +27,7 @@ type CompanyAddress struct {
 	Neighborhood string `json:"neighborhood"`
 	ZipCode      string `json:"zip_code"`
 	City         string `json:"city"`
+	Region       string `json:"region"`
 }
 
 type PartnerResponse struct {

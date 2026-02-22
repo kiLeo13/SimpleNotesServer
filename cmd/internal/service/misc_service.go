@@ -119,6 +119,7 @@ func toCompanyResp(c *entity.Company, cached bool) *contract.CompanyResponse {
 			Neighborhood: c.AddressNeighborhood,
 			ZipCode:      c.AddressZipCode,
 			City:         c.AddressCity,
+			Region:       c.AddressRegion,
 		},
 		Partners: toPartnersResponse(c.Partners),
 		Cached:   cached,

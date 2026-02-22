@@ -23,6 +23,7 @@ type companyResponse struct {
 	AddressNeighborhood string `json:"bairro"`
 	AddressCity         string `json:"municipio"`
 	AddressZipCode      string `json:"cep"`
+	AddressRegion       string `json:"uf"`
 
 	Partners []*partnerResponse `json:"qsa"`
 }
@@ -62,6 +63,7 @@ func (c *companyResponse) ToDomain() *entity.Company {
 		AddressNeighborhood: c.AddressNeighborhood,
 		AddressZipCode:      c.AddressZipCode,
 		AddressCity:         c.AddressCity,
+		AddressRegion:       c.AddressRegion,
 		Partners:            partners,
 	}
 }
