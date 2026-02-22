@@ -78,6 +78,10 @@ func (u *UserService) GetUser(actor *entity.User, rawId string) (*contract.UserR
 }
 
 func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contract.UpdateUserRequest) (*contract.UserResponse, apierror.ErrorResponse) {
+	if req.IsEmpty() {
+		return nil, apierror.EmptyPatchCallError
+	}
+
 	utils.Sanitize(req)
 	if err := u.Validate.Struct(req); err != nil {
 		return nil, apierror.FromValidationError(err)

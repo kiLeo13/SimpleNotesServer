@@ -27,6 +27,10 @@ type UpdateUserRequest struct {
 	Suspended *bool   `json:"suspended" validate:"omitempty"`
 }
 
+func (u *UpdateUserRequest) IsEmpty() bool {
+	return u.Username == nil && u.Perms == nil && u.Suspended == nil
+}
+
 type LogoutRequest struct {
 	AccessToken string `json:"access_token"`
 }
