@@ -15,7 +15,7 @@ type companyResponse struct {
 	RegistrationStatus       string `json:"descricao_situacao_cadastral"`
 	RegistrationStatusReason string `json:"descricao_motivo_situacao_cadastral"`
 	RegistrationStatusDate   string `json:"data_situacao_cadastral"`
-	ShareCapital             int    `json:"capital_social"`
+	ShareCapital             int64  `json:"capital_social"`
 
 	AddressType         string `json:"descricao_tipo_de_logradouro"`
 	AddressStreetName   string `json:"logradouro"`
@@ -45,12 +45,22 @@ func (c *companyResponse) ToDomain() *entity.Company {
 	}
 
 	return &entity.Company{
-		CNPJ:        c.CNPJ,
-		LegalName:   c.LegalName,
-		TradeName:   c.TradeName,
-		LegalNature: c.LegalNature,
-		RegStatus:   translateStatus(c.RegistrationStatus),
-		Partners:    partners,
+		CNPJ:                c.CNPJ,
+		LegalName:           c.LegalName,
+		TradeName:           c.TradeName,
+		LegalNature:         c.LegalNature,
+		CompanySize:         c.CompanySize,
+		BusinessStartDate:   c.BusinessStartDate,
+		ShareCapital:        c.ShareCapital,
+		RegStatus:           translateStatus(c.RegistrationStatus),
+		RegReason:           c.RegistrationStatusReason,
+		RegDate:             c.RegistrationStatusDate,
+		AddressType:         c.AddressType,
+		AddressStreetName:   c.AddressStreetName,
+		AddressNumber:       c.AddressNumber,
+		AddressNeighborhood: c.AddressNeighborhood,
+		AddressCity:         c.AddressCity,
+		Partners:            partners,
 	}
 }
 
