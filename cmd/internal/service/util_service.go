@@ -100,13 +100,27 @@ func (u *MiscService) cacheNegativeResult(cnpj string) {
 
 func toCompanyResp(c *entity.Company, cached bool) *contract.CompanyResponse {
 	return &contract.CompanyResponse{
-		CNPJ:        c.CNPJ,
-		LegalName:   c.LegalName,
-		TradeName:   c.TradeName,
-		LegalNature: c.LegalNature,
-		RegStatus:   string(c.RegStatus),
-		Partners:    toPartnersResponse(c.Partners),
-		Cached:      cached,
+		CNPJ:              c.CNPJ,
+		LegalName:         c.LegalName,
+		TradeName:         c.TradeName,
+		LegalNature:       c.LegalNature,
+		CompanySize:       c.CompanySize,
+		BusinessStartDate: c.BusinessStartDate,
+		ShareCapital:      c.ShareCapital,
+		Registration: &contract.CompanyRegistration{
+			Status: string(c.RegStatus),
+			Reason: c.RegReason,
+			Date:   c.RegDate,
+		},
+		Address: &contract.CompanyAddress{
+			Type:         c.AddressType,
+			StreetName:   c.AddressStreetName,
+			Number:       c.AddressNumber,
+			Neighborhood: c.AddressNeighborhood,
+			City:         c.AddressCity,
+		},
+		Partners: toPartnersResponse(c.Partners),
+		Cached:   cached,
 	}
 }
 

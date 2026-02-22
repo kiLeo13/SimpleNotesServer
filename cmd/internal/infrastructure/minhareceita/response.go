@@ -6,12 +6,24 @@ import (
 )
 
 type companyResponse struct {
-	CNPJ               string             `json:"CNPJ"`
-	LegalName          string             `json:"razao_social"`
-	TradeName          string             `json:"nome_fantasia"`
-	LegalNature        string             `json:"natureza_juridica"`
-	RegistrationStatus string             `json:"descricao_situacao_cadastral"`
-	Partners           []*partnerResponse `json:"qsa"`
+	CNPJ                     string `json:"cnpj"`
+	LegalName                string `json:"razao_social"`
+	TradeName                string `json:"nome_fantasia"`
+	LegalNature              string `json:"natureza_juridica"`
+	CompanySize              string `json:"porte"`
+	BusinessStartDate        string `json:"data_inicio_atividade"`
+	RegistrationStatus       string `json:"descricao_situacao_cadastral"`
+	RegistrationStatusReason string `json:"descricao_motivo_situacao_cadastral"`
+	RegistrationStatusDate   string `json:"data_situacao_cadastral"`
+	ShareCapital             int    `json:"capital_social"`
+
+	AddressType         string `json:"descricao_tipo_de_logradouro"`
+	AddressStreetName   string `json:"logradouro"`
+	AddressNumber       string `json:"numero"`
+	AddressNeighborhood string `json:"bairro"`
+	AddressCity         string `json:"municipio"`
+
+	Partners []*partnerResponse `json:"qsa"`
 }
 
 type partnerResponse struct {

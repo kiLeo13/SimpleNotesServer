@@ -11,11 +11,21 @@ const (
 )
 
 type Company struct {
-	CNPJ        string `gorm:"primaryKey;column:cnpj"`
-	LegalName   string
-	TradeName   string
-	LegalNature string
-	RegStatus   RegStatus
+	CNPJ                string `gorm:"primaryKey;column:cnpj"`
+	LegalName           string
+	TradeName           string
+	LegalNature         string
+	CompanySize         string
+	BusinessStartDate   string
+	ShareCapital        int64
+	RegStatus           RegStatus
+	RegReason           string
+	RegDate             string
+	AddressType         string
+	AddressStreetName   string
+	AddressNumber       string
+	AddressNeighborhood string
+	AddressCity         string
 
 	// Found controls the negative caching strategy for external API lookups:
 	//
