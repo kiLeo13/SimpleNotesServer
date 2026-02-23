@@ -95,7 +95,7 @@ func (p *UserPolicy) CanDeleteUser(actor, target *entity.User) apierror.ErrorRes
 
 	// Admin Immunity
 	if target.Permissions.Has(admin) {
-		return forbiddenError("administrators cannot be deleted")
+		return forbiddenError("Administrators cannot be deleted")
 	}
 
 	return nil
