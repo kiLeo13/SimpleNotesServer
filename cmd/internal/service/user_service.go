@@ -135,6 +135,12 @@ func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierro
 		return perr
 	}
 
+	cerr := u.Cognito.AdminDeleteUser(target.Email)
+	if cerr != nil {
+		log.Errorf("failed to delete user %d from cognito: %v", target.ID, cerr)
+		return apierror.InternalServerError
+	}
+
 	if derr := u.UserRepo.SoftDelete(target); derr != nil {
 		log.Errorf("failed to delete user %d: %v", target.ID, derr)
 		return apierror.InternalServerError
