@@ -97,10 +97,9 @@ func (u *DefaultUserRepository) SoftDelete(user *entity.User) error {
 	user.SubUUID = ""
 	user.UpdatedAt = utils.NowUTC()
 
-	return u.db.Model(user).Updates(map[string]interface{}{
-		"active":     false,
-		"updated_at": user.UpdatedAt,
-	}).Error
+	return u.db.Model(user).
+		Select("Active", "Email", "SubUUID", "UpdatedAt").
+		Updates(user).Error
 }
 
 func (u *DefaultUserRepository) FetchAllActiveOnline() ([]*entity.User, error) {
