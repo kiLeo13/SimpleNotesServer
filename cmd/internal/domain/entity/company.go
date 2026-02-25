@@ -40,13 +40,13 @@ type Company struct {
 	CachedAt int64 `gorm:"autoUpdateTime:false"`
 
 	// Relationships
-	Partners []*CompanyPartner `gorm:"foreignKey:CompanyCNPJ;references:CNPJ"`
+	Partners []*CompanyPartner `gorm:"foreignKey:CompanyCNPJ;references:CNPJ;constraint:OnUpdate:CASCADE;OnDelete:CASCADE;"`
 }
 
 type CompanyPartner struct {
 	ID          int    `gorm:"primaryKey"`
-	CompanyCNPJ string `gorm:"index"`
-	Name        string
+	CompanyCNPJ string `gorm:"uniqueIndex:idx_company_partner_cnpj_name;index"`
+	Name        string `gorm:"uniqueIndex:idx_company_partner_cnpj_name"`
 	Role        string
 	RoleCode    int
 	AgeRange    string
