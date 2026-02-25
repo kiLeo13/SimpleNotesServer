@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	CacheTTLMillis = 10 * 60 * 60 * 1000
+	CacheTTLMillis = 5 * 24 * 60 * 60 * 1000 // 5 days
 	CleanInterval  = 1 * time.Hour
 )
 
