@@ -40,7 +40,7 @@ type Company struct {
 	CachedAt int64 `gorm:"autoUpdateTime:false"`
 
 	// Relationships
-	Partners []*CompanyPartner `gorm:"foreignKey:CompanyCNPJ;references:CNPJ;constraint:OnUpdate:CASCADE;OnDelete:CASCADE;"`
+	Partners []*CompanyPartner `gorm:"foreignKey:CompanyCNPJ;references:CNPJ;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type CompanyPartner struct {
