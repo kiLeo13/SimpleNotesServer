@@ -32,7 +32,7 @@ func (u *UpdateUserRequest) IsEmpty() bool {
 }
 
 type LogoutRequest struct {
-	AccessToken string `json:"access_token"`
+	AccessToken string `json:"access_token" validate:"required"`
 }
 
 type ConfirmSignupRequest struct {
