@@ -106,7 +106,6 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		return nil, updater.err
 	}
 
-	var resp *contract.UserResponse
 	if updater.dirty {
 		target.UpdatedAt = utils.NowUTC()
 		if err := u.UserRepo.Save(target); err != nil {
@@ -115,9 +114,8 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		}
 	}
 
-	resp = toUserResponse(target, actor)
-	u.dispatchUserUpdateEvent(target.ID, resp)
-	return resp, nil
+	u.dispatchUserUpdateEvent(target)
+	return toUserResponse(target, actor), nil
 }
 
 func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierror.ErrorResponse {
@@ -229,6 +227,7 @@ func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.Error
 		log.Errorf("failed to create user: %v", err)
 		return apierror.InternalServerError
 	}
+	u.dispatchUserCreateEvent(user)
 	return nil
 }
 
@@ -379,13 +378,36 @@ func (u *UserService) fetchByID(rawId string, force bool) (*entity.User, apierro
 	return user, nil
 }
 
-func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserResponse) {
-	u.WSService.Broadcast(context.Background(), &events.UserUpdated{
-		UserResponse: user,
+func (u *UserService) dispatchUserCreateEvent(user *entity.User) {
+	u.WSService.BroadcastSupplier(context.Background(), func(userID int) events.SocketEvent {
+		recipient, err := u.UserRepo.FindActiveByID(userID)
+		if err != nil {
+			log.Errorf("failed to find user (%d) by id: %v", userID, err)
+			return nil
+		}
+
+		// This is required to broadcast the correct fields to all users
+		return &events.UserCreated{
+			UserResponse: toUserResponse(user, recipient),
+		}
+	})
+}
+
+func (u *UserService) dispatchUserUpdateEvent(user *entity.User) {
+	u.WSService.BroadcastSupplier(context.Background(), func(userID int) events.SocketEvent {
+		recipient, err := u.UserRepo.FindActiveByID(userID)
+		if err != nil {
+			log.Errorf("failed to find user (%d) by id: %v", userID, err)
+			return nil
+		}
+
+		return &events.UserUpdated{
+			UserResponse: toUserResponse(user, recipient),
+		}
 	})
 
-	if user.Suspended != nil && *user.Suspended {
-		u.WSService.TerminateUserConnections(context.Background(), destID, &events.ConnectionKill{
+	if user.Suspended {
+		u.WSService.TerminateUserConnections(context.Background(), user.ID, &events.ConnectionKill{
 			Code: contract.CodeSuspendedAccount,
 		})
 	}
