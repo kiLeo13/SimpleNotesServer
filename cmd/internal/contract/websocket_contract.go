@@ -13,7 +13,9 @@ const (
 	EventNoteUpdated EventType = "NOTE_UPDATED"
 	EventNoteDeleted EventType = "NOTE_DELETED"
 
+	EventUserCreated EventType = "USER_CREATED"
 	EventUserUpdated EventType = "USER_UPDATED"
+	EventUserDeleted EventType = "USER_DELETED"
 )
 
 type KillCode string
@@ -21,6 +23,7 @@ type KillCode string
 const (
 	CodeSuspendedAccount KillCode = "SUSPENDED_ACCOUNT"
 	CodeIdleTimeout      KillCode = "IDLE_TIMEOUT"
+	CodeDeleted          KillCode = "DELETED"
 	CodeLogout           KillCode = "LOGOUT"
 )
 

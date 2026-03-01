@@ -380,7 +380,7 @@ func (u *UserService) fetchByID(rawId string, force bool) (*entity.User, apierro
 }
 
 func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserResponse) {
-	u.WSService.Dispatch(context.Background(), destID, &events.UserUpdated{
+	u.WSService.Broadcast(context.Background(), &events.UserUpdated{
 		UserResponse: user,
 	})
 
@@ -392,7 +392,13 @@ func (u *UserService) dispatchUserUpdateEvent(destID int, user *contract.UserRes
 }
 
 func (u *UserService) dispatchUserDeleteEvent(userID int) {
-	u.WSService.TerminateUserConnections(context.Background(), userID, nil)
+	u.WSService.Broadcast(context.Background(), &events.UserDeleted{
+		UserID: userID,
+	})
+
+	u.WSService.TerminateUserConnections(context.Background(), userID, &events.ConnectionKill{
+		Code: contract.CodeDeleted,
+	})
 }
 
 func (u *UserService) dispatchLogoutEvent(userID int) {

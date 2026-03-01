@@ -45,10 +45,26 @@ func (e *NoteDeleted) GetType() contract.EventType {
 	return contract.EventNoteDeleted
 }
 
+type UserCreated struct {
+	*contract.UserResponse
+}
+
+func (e *UserCreated) GetType() contract.EventType {
+	return contract.EventUserCreated
+}
+
 type UserUpdated struct {
 	*contract.UserResponse
 }
 
 func (e *UserUpdated) GetType() contract.EventType {
 	return contract.EventUserUpdated
+}
+
+type UserDeleted struct {
+	UserID int `json:"id"`
+}
+
+func (e *UserDeleted) GetType() contract.EventType {
+	return contract.EventUserDeleted
 }
