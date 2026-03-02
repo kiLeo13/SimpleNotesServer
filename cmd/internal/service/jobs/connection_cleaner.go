@@ -53,7 +53,9 @@ func (c *ConnectionCleaner) cleanup() {
 
 	log.Infof("Cleaner: Found %d stale connections. Terminating...", len(conns))
 
+	affectedUsers := make(map[int]bool)
 	for _, conn := range conns {
+		affectedUsers[conn.UserID] = true
 		var envelope contract.OutgoingSocketMessage
 
 		if conn.ExpiresAt < now {
@@ -76,4 +78,18 @@ func (c *ConnectionCleaner) cleanup() {
 
 		_ = c.wsService.ConnRepo.Delete(conn.ConnectionID)
 	}
+
+	for userID := range affectedUsers {
+		count, _ := c.wsService.ConnRepo.CountByUserID(userID)
+		if count == 0 {
+			c.dispatchPresenceEvent(userID, contract.PresenceOffline)
+		}
+	}
+}
+
+func (c *ConnectionCleaner) dispatchPresenceEvent(userID int, presence contract.UserPresence) {
+	c.wsService.Broadcast(context.Background(), &events.PresenceUpdated{
+		UserID:   userID,
+		Presence: presence,
+	})
 }

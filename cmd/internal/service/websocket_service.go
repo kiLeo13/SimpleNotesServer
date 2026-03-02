@@ -18,6 +18,9 @@ type ConnectionRepository interface {
 	Delete(connID string) error
 	FindByUserID(userID int) ([]string, error)
 	FindAll() ([]*entity.Connection, error)
+	FindByID(connID string) (*entity.Connection, error)
+	CountByUserID(userID int) (int64, error)
+	IsOnline(userID int) (bool, error)
 	FindAllConnIDs() ([]string, error)
 	FindStale(now int64, hbLimit int64) ([]*entity.Connection, error)
 	UpdateHeartbeat(connID string, now int64) error
@@ -49,12 +52,26 @@ func (s *WebSocketService) RegisterConnection(userID int, connectionID string, e
 		log.Errorf("failed to save connection: %v", err)
 		return apierror.InternalServerError
 	}
+
+	count, _ := s.ConnRepo.CountByUserID(userID)
+	if count == 1 {
+		s.dispatchPresenceEvent(userID, contract.PresenceOnline)
+	}
 	return nil
 }
 
-func (s *WebSocketService) RemoveConnection(connectionID string) {
-	// We don't return error here because if it fails, it's not the client's fault
-	_ = s.ConnRepo.Delete(connectionID)
+func (s *WebSocketService) RemoveConnection(connID string) {
+	conn, err := s.ConnRepo.FindByID(connID)
+	if err != nil || conn == nil {
+		return
+	}
+
+	_ = s.ConnRepo.Delete(connID)
+
+	count, _ := s.ConnRepo.CountByUserID(conn.UserID)
+	if count == 0 {
+		s.dispatchPresenceEvent(conn.UserID, contract.PresenceOffline)
+	}
 }
 
 func (s *WebSocketService) HandleMessage(msg *contract.IncomingSocketMessage, connID string) {
@@ -151,6 +168,13 @@ func (s *WebSocketService) BroadcastSupplier(ctx context.Context, supplier func(
 		}
 		_ = s.Gateway.PostToConnection(ctx, conn.ConnectionID, envelope)
 	}
+}
+
+func (s *WebSocketService) dispatchPresenceEvent(userID int, presence contract.UserPresence) {
+	s.Broadcast(context.Background(), &events.PresenceUpdated{
+		UserID:   userID,
+		Presence: presence,
+	})
 }
 
 func (s *WebSocketService) handlePing(connID string) {

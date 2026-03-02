@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"simplenotes/cmd/internal/domain/entity"
 )
@@ -36,6 +37,54 @@ func (c *DefaultConnectionRepository) FindByUserID(userID int) ([]string, error)
 	}
 
 	return ids, nil
+}
+
+func (c *DefaultConnectionRepository) FindAllIDs() ([]int, error) {
+	var ids []int
+
+	err := c.db.Model(&entity.Connection{}).
+		Distinct("user_id").
+		Pluck("user_id", &ids).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func (c *DefaultConnectionRepository) CountByUserID(userID int) (int64, error) {
+	var count int64
+	err := c.db.Model(&entity.Connection{}).
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (c *DefaultConnectionRepository) FindByID(connID string) (*entity.Connection, error) {
+	var conn entity.Connection
+	err := c.db.First(&conn, "connection_id = ?", connID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return &conn, nil
+}
+
+func (c *DefaultConnectionRepository) IsOnline(userID int) (bool, error) {
+	var exists bool
+	err := c.db.
+		Raw("SELECT EXISTS(SELECT 1 FROM connections WHERE user_id = ?)", userID).
+		Scan(&exists).Error
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (c *DefaultConnectionRepository) FindAllConnIDs() ([]string, error) {

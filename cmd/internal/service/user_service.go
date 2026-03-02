@@ -58,7 +58,13 @@ func (u *UserService) GetUsers(actor *entity.User) ([]*contract.UserResponse, ap
 
 	resp := make([]*contract.UserResponse, len(users))
 	for i, user := range users {
-		resp[i] = toUserResponse(user, actor)
+		presence := contract.PresenceOffline
+		isOnline, _ := u.WSService.ConnRepo.IsOnline(user.ID)
+		if isOnline {
+			presence = contract.PresenceOnline
+		}
+
+		resp[i] = toUserResponse(user, actor, presence)
 	}
 	return resp, nil
 }
@@ -73,7 +79,13 @@ func (u *UserService) GetUser(actor *entity.User, rawId string) (*contract.UserR
 		return nil, apierror.NotFoundError
 	}
 
-	resp := toUserResponse(user, actor)
+	presence := contract.PresenceOffline
+	isOnline, _ := u.WSService.ConnRepo.IsOnline(user.ID)
+	if isOnline {
+		presence = contract.PresenceOnline
+	}
+
+	resp := toUserResponse(user, actor, presence)
 	return resp, nil
 }
 
@@ -114,8 +126,14 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		}
 	}
 
-	u.dispatchUserUpdateEvent(target)
-	return toUserResponse(target, actor), nil
+	presence := contract.PresenceOffline
+	isOnline, _ := u.WSService.ConnRepo.IsOnline(target.ID)
+	if isOnline {
+		presence = contract.PresenceOnline
+	}
+
+	u.dispatchUserUpdateEvent(target, presence)
+	return toUserResponse(target, actor, presence), nil
 }
 
 func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierror.ErrorResponse {
@@ -301,7 +319,14 @@ func (u *UserService) ConfirmSignup(req *contract.ConfirmSignupRequest) apierror
 	if err != nil {
 		log.Errorf("failed to update user (%d) verified status: %v", user.ID, err)
 	}
-	u.dispatchUserUpdateEvent(user)
+
+	presence := contract.PresenceOffline
+	isOnline, _ := u.WSService.ConnRepo.IsOnline(user.ID)
+	if isOnline {
+		presence = contract.PresenceOnline
+	}
+
+	u.dispatchUserUpdateEvent(user, presence)
 	return nil
 }
 
@@ -388,13 +413,15 @@ func (u *UserService) dispatchUserCreateEvent(user *entity.User) {
 		}
 
 		// This is required to broadcast the correct fields to all users
+		// Additionally, we dispatch the event as OFFLINE without checking it,
+		// since it is impossible for a user to just create an account and already be online
 		return &events.UserCreated{
-			UserResponse: toUserResponse(user, recipient),
+			UserResponse: toUserResponse(user, recipient, contract.PresenceOffline),
 		}
 	})
 }
 
-func (u *UserService) dispatchUserUpdateEvent(user *entity.User) {
+func (u *UserService) dispatchUserUpdateEvent(user *entity.User, presence contract.UserPresence) {
 	u.WSService.BroadcastSupplier(context.Background(), func(userID int) events.SocketEvent {
 		recipient, err := u.UserRepo.FindActiveByID(userID)
 		if err != nil {
@@ -403,7 +430,7 @@ func (u *UserService) dispatchUserUpdateEvent(user *entity.User) {
 		}
 
 		return &events.UserUpdated{
-			UserResponse: toUserResponse(user, recipient),
+			UserResponse: toUserResponse(user, recipient, presence),
 		}
 	})
 
@@ -466,7 +493,7 @@ func handleConfirmResend(cogClient cognitoclient.Client, email string) apierror.
 	return nil
 }
 
-func toUserResponse(user, requester *entity.User) *contract.UserResponse {
+func toUserResponse(user, requester *entity.User, presence contract.UserPresence) *contract.UserResponse {
 	if !user.Active {
 		return toDeletedUserResponse(user)
 	}
@@ -475,6 +502,7 @@ func toUserResponse(user, requester *entity.User) *contract.UserResponse {
 		ID:        user.ID,
 		Username:  user.Username,
 		Perms:     int64(user.Permissions),
+		Presence:  presence,
 		CreatedAt: utils.FormatEpoch(user.CreatedAt),
 		UpdatedAt: utils.FormatEpoch(user.UpdatedAt),
 	}

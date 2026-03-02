@@ -16,6 +16,8 @@ const (
 	EventUserCreated EventType = "USER_CREATED"
 	EventUserUpdated EventType = "USER_UPDATED"
 	EventUserDeleted EventType = "USER_DELETED"
+
+	EventPresenceUpdated EventType = "PRESENCE_UPDATED"
 )
 
 type KillCode string
