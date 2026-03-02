@@ -455,6 +455,15 @@ func (u *UserService) dispatchLogoutEvent(userID int) {
 	u.WSService.TerminateUserConnections(context.Background(), userID, &events.ConnectionKill{
 		Code: contract.CodeLogout,
 	})
+
+	u.dispatchPresenceEvent(userID, contract.PresenceOffline)
+}
+
+func (u *UserService) dispatchPresenceEvent(userID int, presence contract.UserPresence) {
+	u.WSService.Broadcast(context.Background(), &events.PresenceUpdated{
+		UserID:   userID,
+		Presence: presence,
+	})
 }
 
 func handleUserSignup(cogClient cognitoclient.Client, req *cognitoclient.User) (string, apierror.ErrorResponse, func()) {
