@@ -68,3 +68,12 @@ type UserDeleted struct {
 func (e *UserDeleted) GetType() contract.EventType {
 	return contract.EventUserDeleted
 }
+
+type PresenceUpdated struct {
+	UserID   int                   `json:"id"`
+	Presence contract.UserPresence `json:"presence"`
+}
+
+func (p *PresenceUpdated) GetType() contract.EventType {
+	return contract.EventPresenceUpdated
+}

@@ -8,6 +8,13 @@ const (
 	EmailStatusVerifying EmailStatus = "VERIFYING"
 )
 
+type UserPresence string
+
+const (
+	PresenceOnline  UserPresence = "ONLINE"
+	PresenceOffline UserPresence = "OFFLINE"
+)
+
 type CreateUserRequest struct {
 	Username string `json:"username" validate:"required,min=2,max=80"`
 	Email    string `json:"email" validate:"required,email"`
@@ -49,13 +56,14 @@ type UserStatusRequest struct {
 }
 
 type UserResponse struct {
-	ID         int    `json:"id"`
-	Username   string `json:"username"`
-	Perms      int64  `json:"permissions"`
-	IsVerified *bool  `json:"is_verified,omitempty"`
-	Suspended  *bool  `json:"suspended,omitempty"`
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
+	ID         int          `json:"id"`
+	Username   string       `json:"username"`
+	Perms      int64        `json:"permissions"`
+	Presence   UserPresence `json:"presence"`
+	IsVerified *bool        `json:"is_verified,omitempty"`
+	Suspended  *bool        `json:"suspended,omitempty"`
+	CreatedAt  string       `json:"created_at"`
+	UpdatedAt  string       `json:"updated_at"`
 }
 
 type UserLoginResponse struct {
