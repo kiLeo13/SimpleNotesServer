@@ -301,6 +301,7 @@ func (u *UserService) ConfirmSignup(req *contract.ConfirmSignupRequest) apierror
 	if err != nil {
 		log.Errorf("failed to update user (%d) verified status: %v", user.ID, err)
 	}
+	u.dispatchUserUpdateEvent(user)
 	return nil
 }
 
