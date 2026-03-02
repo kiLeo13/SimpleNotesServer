@@ -12,7 +12,6 @@ type NoteVisibility string
 
 const (
 	VisibilityPublic  NoteVisibility = "PUBLIC"
-	VisibilityOrg     NoteVisibility = "ORG"
 	VisibilityPrivate NoteVisibility = "PRIVATE"
 )
 
