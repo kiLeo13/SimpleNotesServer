@@ -104,6 +104,10 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		return nil, apierr
 	}
 
+	if target == nil {
+		return nil, apierror.NotFoundError
+	}
+
 	updater := &userUpdater{
 		actor:  actor,
 		target: target,
