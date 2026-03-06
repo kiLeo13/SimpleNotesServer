@@ -80,8 +80,8 @@ func (c *ConnectionCleaner) cleanup() {
 	}
 
 	for userID := range affectedUsers {
-		count, _ := c.wsService.ConnRepo.CountByUserID(userID)
-		if count == 0 {
+		isOnline, _ := c.wsService.ConnRepo.IsOnline(userID)
+		if !isOnline {
 			c.dispatchPresenceEvent(userID, contract.PresenceOffline)
 		}
 	}

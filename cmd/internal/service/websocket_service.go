@@ -48,13 +48,14 @@ func (s *WebSocketService) RegisterConnection(userID int, connectionID string, e
 		CreatedAt:       utils.NowUTC(),
 	}
 
+	wasOnline, _ := s.ConnRepo.IsOnline(userID)
+
 	if err := s.ConnRepo.Save(conn); err != nil {
 		log.Errorf("failed to save connection: %v", err)
 		return apierror.InternalServerError
 	}
 
-	count, _ := s.ConnRepo.CountByUserID(userID)
-	if count == 1 {
+	if !wasOnline {
 		s.dispatchPresenceEvent(userID, contract.PresenceOnline)
 	}
 	return nil
@@ -68,8 +69,8 @@ func (s *WebSocketService) RemoveConnection(connID string) {
 
 	_ = s.ConnRepo.Delete(connID)
 
-	count, _ := s.ConnRepo.CountByUserID(conn.UserID)
-	if count == 0 {
+	isOnline, _ := s.ConnRepo.IsOnline(conn.UserID)
+	if !isOnline {
 		s.dispatchPresenceEvent(conn.UserID, contract.PresenceOffline)
 	}
 }
