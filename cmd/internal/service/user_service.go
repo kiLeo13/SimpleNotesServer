@@ -239,6 +239,7 @@ func (u *UserService) CreateUser(req *contract.CreateUserRequest) apierror.Error
 		Username:      req.Username,
 		Email:         req.Email,
 		EmailVerified: false,
+		Permissions:   1,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
