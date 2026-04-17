@@ -13,6 +13,7 @@ node_modules/
 # Workspace files
 go.work
 go.work.sum
+.gocache/
 
 .env
 .idea/
