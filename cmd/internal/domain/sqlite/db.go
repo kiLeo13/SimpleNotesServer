@@ -22,6 +22,8 @@ func Init() (*gorm.DB, error) {
 	}
 
 	err = db.AutoMigrate(
+		&entity.AuditLogEvent{},
+		&entity.AuditLogChange{},
 		&entity.Note{},
 		&entity.User{},
 		&entity.Connection{},
