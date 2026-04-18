@@ -8,6 +8,17 @@ This repository is a Go API backed by SQLite and exposed through Echo HTTP route
 
 This document is for agents making schema, query, or migration changes related to database indexes.
 
+## Audit Log Notes
+
+When working on the audit feature:
+
+- Keep audit payloads structured. Store action/entity metadata and field-level changes, not sentence blobs.
+- Group multi-field mutations under one `audit_log_events` row and attach the individual field changes through `audit_log_changes`.
+- `audit_log_events.id` is an application-generated `SonyFlake` `int64` value anchored at `2025-01-01T00:00:00Z`.
+- Do not store raw note content in audit rows. Use safe metadata such as visibility, note type, tags, creator id, and content size.
+- Record audited mutations inside the same database transaction as the primary write whenever the primary write is also in SQLite.
+- If you add a new audited action, update tests and `ARCHITECTURE.md` in the same change.
+
 Acceptance criteria for index work:
 
 - Every proposed index is tied to a concrete repository query or job.

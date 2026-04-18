@@ -34,11 +34,30 @@ SQLite initialization lives in [db.go](C:/Users/Leonardo/Documents/Repositories/
 
 Persisted entities:
 
+- `audit_log_events`
+- `audit_log_changes`
 - `users`
 - `notes`
 - `connections`
 - `companies`
 - `company_partners`
+
+## Audit Log Model
+
+The audit system stores one parent event plus zero or more child changes:
+
+- `audit_log_events` stores the event identity, actor, action type, subject type, subject id, source, and timestamp.
+- `audit_log_changes` stores the individual changed fields for that event, including old/new values and a value type.
+
+Event IDs are generated in the application with `SonyFlake` using a start time of `2025-01-01T00:00:00Z`. The database keeps them as `int64` for efficient ordering and pagination, while API responses serialize them as strings to avoid JavaScript precision issues.
+
+The current audit coverage includes:
+
+- note create, update, and delete
+- user update, suspend/unsuspend, and delete
+- company lookup by CNPJ
+
+Note audit rows intentionally avoid storing raw note content. They record structured metadata such as note id, creator id, visibility, note type, tags, and content size instead.
 
 The code constrains SQLite to a single open connection, which means query efficiency matters because there is limited room to hide slow scans behind parallelism.
 
@@ -52,6 +71,7 @@ Middleware:
 
 Service layer:
 
+- [audit_service.go](C:/Users/Leonardo/Documents/Repositories/Magalu/SimpleNotesServer/cmd/internal/service/audit_service.go)
 - [user_service.go](C:/Users/Leonardo/Documents/Repositories/Magalu/SimpleNotesServer/cmd/internal/service/user_service.go)
 - [note_service.go](C:/Users/Leonardo/Documents/Repositories/Magalu/SimpleNotesServer/cmd/internal/service/note_service.go)
 - [websocket_service.go](C:/Users/Leonardo/Documents/Repositories/Magalu/SimpleNotesServer/cmd/internal/service/websocket_service.go)
@@ -60,6 +80,19 @@ Service layer:
 Repository layer:
 
 - [cmd/internal/domain/sqlite/repository](C:/Users/Leonardo/Documents/Repositories/Magalu/SimpleNotesServer/cmd/internal/domain/sqlite/repository)
+
+Protected audit endpoint:
+
+- `GET /api/audit-logs`
+
+Supported filters:
+
+- `before_id`
+- `limit`
+- `actor_user_id`
+- `subject_type`
+- `subject_id`
+- `action_type`
 
 ## Index-Relevant Paths
 
