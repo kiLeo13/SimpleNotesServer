@@ -18,39 +18,50 @@ import (
 	"simplenotes/cmd/internal/infrastructure/aws/storage"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
+	"strconv"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 type NoteRepository interface {
 	FindAll(withPrivate bool) ([]*entity.Note, error)
 	FindByID(id int) (*entity.Note, error)
 	Save(note *entity.Note) error
+	SaveWithDB(db *gorm.DB, note *entity.Note) error
 	Delete(note *entity.Note) error
+	DeleteWithDB(db *gorm.DB, note *entity.Note) error
 }
 
 type NoteService struct {
+	DB         *gorm.DB
 	NoteRepo   NoteRepository
 	UserRepo   UserRepository
 	WSService  *WebSocketService
 	S3         storage.S3Client
 	Validate   *validator.Validate
+	Audit      *AuditService
 	NotePolicy *policy.NotePolicy
 }
 
 func NewNoteService(
+	db *gorm.DB,
 	noteRepo NoteRepository,
 	userRepo UserRepository,
 	wsService *WebSocketService,
 	s3 storage.S3Client,
 	validate *validator.Validate,
+	auditService *AuditService,
 	notePolicy *policy.NotePolicy,
 ) *NoteService {
 	return &NoteService{
+		DB:         db,
 		NoteRepo:   noteRepo,
 		UserRepo:   userRepo,
 		WSService:  wsService,
 		S3:         s3,
 		Validate:   validate,
+		Audit:      auditService,
 		NotePolicy: notePolicy,
 	}
 }
@@ -109,7 +120,20 @@ func (n *NoteService) CreateTextNote(actor *entity.User, req *contract.TextNoteR
 		UpdatedAt:   now,
 	}
 
-	if err := n.NoteRepo.Save(note); err != nil {
+	err := n.DB.Transaction(func(tx *gorm.DB) error {
+		if err := n.NoteRepo.SaveWithDB(tx, note); err != nil {
+			return err
+		}
+		return n.Audit.Record(tx, &entity.AuditLogEvent{
+			ActorUserID: &actor.ID,
+			ActionType:  entity.AuditActionNoteCreate,
+			SubjectType: entity.AuditSubjectNote,
+			SubjectID:   strconv.Itoa(note.ID),
+			Source:      entity.AuditSourceHTTPAPI,
+			Changes:     buildNoteCreateAuditChanges(note),
+		})
+	})
+	if err != nil {
 		log.Errorf("failed to save note: %v", err)
 		return nil, apierror.InternalServerError
 	}
@@ -153,7 +177,21 @@ func (n *NoteService) CreateFileNote(actor *entity.User, req *contract.NoteReque
 		UpdatedAt:   now,
 	}
 
-	if err := n.NoteRepo.Save(note); err != nil {
+	err := n.DB.Transaction(func(tx *gorm.DB) error {
+		if err := n.NoteRepo.SaveWithDB(tx, note); err != nil {
+			return err
+		}
+		return n.Audit.Record(tx, &entity.AuditLogEvent{
+			ActorUserID: &actor.ID,
+			ActionType:  entity.AuditActionNoteCreate,
+			SubjectType: entity.AuditSubjectNote,
+			SubjectID:   strconv.Itoa(note.ID),
+			Source:      entity.AuditSourceHTTPAPI,
+			Changes:     buildNoteCreateAuditChanges(note),
+		})
+	})
+	if err != nil {
+		_ = deleteBucketObject(n.S3, note)
 		log.Errorf("failed to create note: %v", err)
 		return nil, apierror.InternalServerError
 	}
@@ -180,6 +218,8 @@ func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.U
 		return nil, apierror.FromValidationError(valerr)
 	}
 
+	before := *note
+
 	// Now, we can finally PATCH our data :D
 	tags := strings.Join(req.Tags, " ")
 	if req.Name != nil {
@@ -193,7 +233,24 @@ func (n *NoteService) UpdateNote(actor *entity.User, noteId int, req *contract.U
 	}
 
 	note.UpdatedAt = utils.NowUTC()
-	err = n.NoteRepo.Save(note)
+	changes := buildNoteUpdateAuditChanges(&before, note)
+
+	err = n.DB.Transaction(func(tx *gorm.DB) error {
+		if err := n.NoteRepo.SaveWithDB(tx, note); err != nil {
+			return err
+		}
+		if len(changes) == 0 {
+			return nil
+		}
+		return n.Audit.Record(tx, &entity.AuditLogEvent{
+			ActorUserID: &actor.ID,
+			ActionType:  entity.AuditActionNoteUpdate,
+			SubjectType: entity.AuditSubjectNote,
+			SubjectID:   strconv.Itoa(note.ID),
+			Source:      entity.AuditSourceHTTPAPI,
+			Changes:     changes,
+		})
+	})
 	if err != nil {
 		log.Errorf("failed to update note: %v", err)
 		return nil, apierror.InternalServerError
@@ -222,7 +279,19 @@ func (n *NoteService) DeleteNote(actor *entity.User, noteId int) apierror.ErrorR
 		return apierror.InternalServerError
 	}
 
-	err = n.NoteRepo.Delete(note)
+	err = n.DB.Transaction(func(tx *gorm.DB) error {
+		if err := n.NoteRepo.DeleteWithDB(tx, note); err != nil {
+			return err
+		}
+		return n.Audit.Record(tx, &entity.AuditLogEvent{
+			ActorUserID: &actor.ID,
+			ActionType:  entity.AuditActionNoteDelete,
+			SubjectType: entity.AuditSubjectNote,
+			SubjectID:   strconv.Itoa(note.ID),
+			Source:      entity.AuditSourceHTTPAPI,
+			Changes:     buildNoteDeleteAuditChanges(note),
+		})
+	})
 	if err != nil {
 		log.Errorf("failed to delete note: %v", err)
 		return apierror.InternalServerError
@@ -355,4 +424,34 @@ func toTagsArray(tags string) []string {
 		return []string{}
 	}
 	return strings.Split(tags, " ")
+}
+
+func buildNoteCreateAuditChanges(note *entity.Note) []*entity.AuditLogChange {
+	return []*entity.AuditLogChange{
+		newAuditCreateValue("name", entity.AuditValueTypeString, note.Name),
+		newAuditCreateValue("created_by_id", entity.AuditValueTypeInt, strconv.Itoa(note.CreatedByID)),
+		newAuditCreateValue("tags", entity.AuditValueTypeStringArray, auditJSONString(toTagsArray(note.Tags))),
+		newAuditCreateValue("note_type", entity.AuditValueTypeEnum, string(note.NoteType)),
+		newAuditCreateValue("content_size", entity.AuditValueTypeInt, strconv.Itoa(note.ContentSize)),
+		newAuditCreateValue("visibility", entity.AuditValueTypeEnum, string(note.Visibility)),
+	}
+}
+
+func buildNoteUpdateAuditChanges(before, after *entity.Note) []*entity.AuditLogChange {
+	var changes []*entity.AuditLogChange
+	appendAuditStringChange(&changes, "name", before.Name, after.Name)
+	appendAuditEnumChange(&changes, "visibility", string(before.Visibility), string(after.Visibility))
+	appendAuditStringArrayChange(&changes, "tags", toTagsArray(before.Tags), toTagsArray(after.Tags))
+	return changes
+}
+
+func buildNoteDeleteAuditChanges(note *entity.Note) []*entity.AuditLogChange {
+	return []*entity.AuditLogChange{
+		newAuditDeleteValue("name", entity.AuditValueTypeString, note.Name),
+		newAuditDeleteValue("created_by_id", entity.AuditValueTypeInt, strconv.Itoa(note.CreatedByID)),
+		newAuditDeleteValue("tags", entity.AuditValueTypeStringArray, auditJSONString(toTagsArray(note.Tags))),
+		newAuditDeleteValue("note_type", entity.AuditValueTypeEnum, string(note.NoteType)),
+		newAuditDeleteValue("content_size", entity.AuditValueTypeInt, strconv.Itoa(note.ContentSize)),
+		newAuditDeleteValue("visibility", entity.AuditValueTypeEnum, string(note.Visibility)),
+	}
 }

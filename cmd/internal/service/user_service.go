@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/log"
+	"gorm.io/gorm"
 )
 
 type UserRepository interface {
@@ -22,30 +23,38 @@ type UserRepository interface {
 	FindActiveByID(id int) (*entity.User, error)
 	FindByID(id int) (*entity.User, error)
 	SoftDelete(user *entity.User) error
+	SoftDeleteWithDB(db *gorm.DB, user *entity.User) error
 	ExistsActiveByEmail(email string) (bool, error)
 	Save(user *entity.User) error
+	SaveWithDB(db *gorm.DB, user *entity.User) error
 }
 
 type UserService struct {
+	DB         *gorm.DB
 	UserRepo   UserRepository
 	Validate   *validator.Validate
 	WSService  *WebSocketService
 	Cognito    cognitoclient.Client
+	Audit      *AuditService
 	UserPolicy *policy.UserPolicy
 }
 
 func NewUserService(
+	db *gorm.DB,
 	userRepo UserRepository,
 	validate *validator.Validate,
 	wsService *WebSocketService,
 	cogClient cognitoclient.Client,
+	auditService *AuditService,
 	userPolicy *policy.UserPolicy,
 ) *UserService {
 	return &UserService{
+		DB:         db,
 		UserRepo:   userRepo,
 		Validate:   validate,
 		WSService:  wsService,
 		Cognito:    cogClient,
+		Audit:      auditService,
 		UserPolicy: userPolicy,
 	}
 }
@@ -113,6 +122,7 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 		target: target,
 		policy: u.UserPolicy,
 	}
+	before := *target
 
 	updater.setProfileString(req.Username, &target.Username)
 	updater.setPermissions(req.Perms)
@@ -124,7 +134,24 @@ func (u *UserService) UpdateUser(actor *entity.User, targetId string, req *contr
 
 	if updater.dirty {
 		target.UpdatedAt = utils.NowUTC()
-		if err := u.UserRepo.Save(target); err != nil {
+		changes := buildUserUpdateAuditChanges(&before, target)
+		actionType := resolveUserAuditAction(&before, target)
+		if err := u.DB.Transaction(func(tx *gorm.DB) error {
+			if err := u.UserRepo.SaveWithDB(tx, target); err != nil {
+				return err
+			}
+			if len(changes) == 0 {
+				return nil
+			}
+			return u.Audit.Record(tx, &entity.AuditLogEvent{
+				ActorUserID: &actor.ID,
+				ActionType:  actionType,
+				SubjectType: entity.AuditSubjectUser,
+				SubjectID:   strconv.Itoa(target.ID),
+				Source:      entity.AuditSourceHTTPAPI,
+				Changes:     changes,
+			})
+		}); err != nil {
 			log.Errorf("actor %s failed to update user %s: %v", actor.SubUUID, targetId, err)
 			return nil, apierror.InternalServerError
 		}
@@ -161,7 +188,26 @@ func (u *UserService) DeleteUser(actor *entity.User, targetRawID string) apierro
 		return apierror.InternalServerError
 	}
 
-	if derr := u.UserRepo.SoftDelete(target); derr != nil {
+	if derr := u.DB.Transaction(func(tx *gorm.DB) error {
+		if err := u.UserRepo.SoftDeleteWithDB(tx, target); err != nil {
+			return err
+		}
+		return u.Audit.Record(tx, &entity.AuditLogEvent{
+			ActorUserID: &actor.ID,
+			ActionType:  entity.AuditActionUserDelete,
+			SubjectType: entity.AuditSubjectUser,
+			SubjectID:   strconv.Itoa(target.ID),
+			Source:      entity.AuditSourceHTTPAPI,
+			Changes: []*entity.AuditLogChange{
+				{
+					FieldName: "active",
+					OldValue:  auditValuePtr("true"),
+					NewValue:  auditValuePtr("false"),
+					ValueType: entity.AuditValueTypeBool,
+				},
+			},
+		})
+	}); derr != nil {
 		log.Errorf("failed to delete user %d: %v", target.ID, derr)
 		return apierror.InternalServerError
 	}
@@ -541,4 +587,22 @@ func toDeletedUserResponse(user *entity.User) *contract.UserResponse {
 		CreatedAt: utils.FormatEpoch(0),
 		UpdatedAt: utils.FormatEpoch(0),
 	}
+}
+
+func buildUserUpdateAuditChanges(before, after *entity.User) []*entity.AuditLogChange {
+	var changes []*entity.AuditLogChange
+	appendAuditStringChange(&changes, "username", before.Username, after.Username)
+	appendAuditIntChange(&changes, "permissions", int64(before.Permissions), int64(after.Permissions))
+	appendAuditBoolChange(&changes, "suspended", before.Suspended, after.Suspended)
+	return changes
+}
+
+func resolveUserAuditAction(before, after *entity.User) entity.AuditActionType {
+	if before.Suspended != after.Suspended {
+		if after.Suspended {
+			return entity.AuditActionUserSuspend
+		}
+		return entity.AuditActionUserUnsuspend
+	}
+	return entity.AuditActionUserUpdate
 }

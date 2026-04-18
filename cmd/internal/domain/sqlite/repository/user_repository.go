@@ -102,6 +102,21 @@ func (u *DefaultUserRepository) SoftDelete(user *entity.User) error {
 		Updates(user).Error
 }
 
+func (u *DefaultUserRepository) SoftDeleteWithDB(db *gorm.DB, user *entity.User) error {
+	if db == nil {
+		db = u.db
+	}
+
+	user.Active = false
+	user.Email = ""
+	user.SubUUID = ""
+	user.UpdatedAt = utils.NowUTC()
+
+	return db.Model(user).
+		Select("Active", "Email", "SubUUID", "UpdatedAt").
+		Updates(user).Error
+}
+
 func (u *DefaultUserRepository) FetchAllActiveOnline() ([]*entity.User, error) {
 	var users []*entity.User
 	err := u.db.Table("users").
@@ -118,4 +133,11 @@ func (u *DefaultUserRepository) FetchAllActiveOnline() ([]*entity.User, error) {
 
 func (u *DefaultUserRepository) Save(user *entity.User) error {
 	return u.db.Save(user).Error
+}
+
+func (u *DefaultUserRepository) SaveWithDB(db *gorm.DB, user *entity.User) error {
+	if db == nil {
+		db = u.db
+	}
+	return db.Save(user).Error
 }

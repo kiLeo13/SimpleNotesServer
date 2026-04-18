@@ -48,6 +48,20 @@ func (d *DefaultNoteRepository) Save(note *entity.Note) error {
 	return d.db.Save(note).Error
 }
 
+func (d *DefaultNoteRepository) SaveWithDB(db *gorm.DB, note *entity.Note) error {
+	if db == nil {
+		db = d.db
+	}
+	return db.Save(note).Error
+}
+
 func (d *DefaultNoteRepository) Delete(note *entity.Note) error {
 	return d.db.Delete(note).Error
+}
+
+func (d *DefaultNoteRepository) DeleteWithDB(db *gorm.DB, note *entity.Note) error {
+	if db == nil {
+		db = d.db
+	}
+	return db.Delete(note).Error
 }

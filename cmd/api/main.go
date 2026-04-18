@@ -84,16 +84,23 @@ func main() {
 	noteRepo := repository.NewNoteRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	compRepo := repository.NewCompanyRepository(db)
+	auditRepo := repository.NewAuditRepository(db)
+
+	auditService, err := service.NewAuditService(db, auditRepo, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	connService := service.NewWebSocketService(connRepo, wsClient)
-	userService := service.NewUserService(userRepo, validate, connService, cogClient, userPolicy)
-	noteService := service.NewNoteService(noteRepo, userRepo, connService, s3Client, validate, notePolicy)
-	miscService := service.NewMiscService(receitaClient, compRepo)
+	userService := service.NewUserService(db, userRepo, validate, connService, cogClient, auditService, userPolicy)
+	noteService := service.NewNoteService(db, noteRepo, userRepo, connService, s3Client, validate, auditService, notePolicy)
+	miscService := service.NewMiscService(receitaClient, compRepo, auditService)
 
 	connRoutes := handler.NewWSDefault(connService)
 	noteRoutes := handler.NewNoteDefault(noteService)
 	userRoutes := handler.NewUserDefault(userService)
 	miscRoutes := handler.NewMiscRoute(miscService)
+	auditRoutes := handler.NewAuditDefault(auditService)
 
 	// --- Background Jobs ---
 	connCleaner := jobs.NewConnectionCleaner(connService)
@@ -118,7 +125,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// --- Register Routes ---
-	registerRoutes(e, noteRoutes, userRoutes, miscRoutes, connRoutes, authMiddleware)
+	registerRoutes(e, noteRoutes, userRoutes, miscRoutes, auditRoutes, connRoutes, authMiddleware)
 
 	if err = e.Start(":7070"); err != nil {
 		panic(err)
@@ -131,6 +138,7 @@ func registerRoutes(
 	noteH *handler.DefaultNoteRoute,
 	userH *handler.DefaultUserRoute,
 	miscH *handler.DefaultMiscRoute,
+	auditH *handler.DefaultAuditRoute,
 	wsH *handler.DefaultWSRoute,
 	authMiddleware echo.MiddlewareFunc,
 ) {
@@ -166,6 +174,7 @@ func registerRoutes(
 
 	// Misc
 	protected.GET("/misc/cnpj/:cnpj", miscH.GetCompany)
+	protected.GET("/audit-logs", auditH.GetAuditLogs)
 
 	// --- WebSocket ---
 	ws := e.Group("/ws")

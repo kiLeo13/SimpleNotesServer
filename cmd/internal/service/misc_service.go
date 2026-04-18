@@ -9,7 +9,12 @@ import (
 	"simplenotes/cmd/internal/infrastructure/minhareceita"
 	"simplenotes/cmd/internal/utils"
 	"simplenotes/cmd/internal/utils/apierror"
+	"strconv"
 )
+
+type CompanyLookupClient interface {
+	GetByCNPJ(ctx context.Context, cnpj string) (*entity.Company, error)
+}
 
 type CompanyRepository interface {
 	Save(company *entity.Company) error
@@ -17,14 +22,16 @@ type CompanyRepository interface {
 }
 
 type MiscService struct {
-	ReceitaClient *minhareceita.Client
+	ReceitaClient CompanyLookupClient
 	CompanyRepo   CompanyRepository
+	AuditService  *AuditService
 }
 
-func NewMiscService(client *minhareceita.Client, companyRepo CompanyRepository) *MiscService {
+func NewMiscService(client CompanyLookupClient, companyRepo CompanyRepository, auditService *AuditService) *MiscService {
 	return &MiscService{
 		ReceitaClient: client,
 		CompanyRepo:   companyRepo,
+		AuditService:  auditService,
 	}
 }
 
@@ -37,6 +44,8 @@ func (u *MiscService) GetCompanyByCNPJ(actor *entity.User, cnpj string) (*contra
 	if err != nil {
 		return nil, err
 	}
+
+	u.recordCompanyLookup(actor, cnpj, company != nil, fromCache)
 	return toCompanyResp(company, fromCache), nil
 }
 
@@ -96,6 +105,28 @@ func (u *MiscService) cacheNegativeResult(cnpj string) {
 		Found: false,
 	}
 	_ = u.CompanyRepo.Save(emptyCompany)
+}
+
+func (u *MiscService) recordCompanyLookup(actor *entity.User, cnpj string, found bool, fromCache bool) {
+	if u.AuditService == nil {
+		return
+	}
+
+	event := &entity.AuditLogEvent{
+		ActorUserID: &actor.ID,
+		ActionType:  entity.AuditActionCompanyLookup,
+		SubjectType: entity.AuditSubjectCompany,
+		SubjectID:   cnpj,
+		Source:      entity.AuditSourceHTTPAPI,
+		Changes: []*entity.AuditLogChange{
+			newAuditCreateValue("found", entity.AuditValueTypeBool, strconv.FormatBool(found)),
+			newAuditCreateValue("cache_hit", entity.AuditValueTypeBool, strconv.FormatBool(fromCache)),
+		},
+	}
+
+	if err := u.AuditService.Record(nil, event); err != nil {
+		log.Errorf("failed to record company lookup audit log for cnpj %s: %v", cnpj, err)
+	}
 }
 
 func toCompanyResp(c *entity.Company, cached bool) *contract.CompanyResponse {
